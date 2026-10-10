@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block title %}Register - Therapist{% endblock %}
+
+{% block auth_content %}
+<style>
+    .auth-bg { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#0f0c29,#302b63,#24243e); padding:40px 20px; position:relative; overflow:hidden; }
+    .auth-bg::before { content:''; position:absolute; width:500px; height:500px; background:#8b5cf6; border-radius:50%; filter:blur(80px); opacity:0.15; top:-200px; right:-200px; }
+    .auth-card { background:rgba(255,255,255,0.1); backdrop-filter:blur(30px); border:1px solid rgba(255,255,255,0.2); border-radius:28px; padding:40px; width:100%; max-width:580px; position:relative; z-index:1; box-shadow:0 24px 80px rgba(0,0,0,0.4); }
+    .auth-title { font-size:24px; font-weight:800; color:#f8fafc; margin-bottom:4px; }
+    .auth-subtitle { color:rgba(248,250,252,0.6); font-size:14px; margin-bottom:28px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .form-group { margin-bottom:14px; }
+    .form-group.full { grid-column:1/-1; }
+    label { display:block; font-size:13px; font-weight:600; color:rgba(248,250,252,0.8); margin-bottom:6px; }
+    input, select { width:100%; padding:12px 14px; border-radius:12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#f8fafc; font-size:14px; outline:none; transition:border-color 0.2s,box-shadow 0.2s; box-sizing:border-box; }
+    input:focus, select:focus { border-color:#8b5cf6; background:rgba(255,255,255,0.12); }
+    input[type="file"] { padding:8px 14px; cursor:pointer; }
+    input::placeholder { color:rgba(255,255,255,0.3); }
+    select option { background:#1e1b4b; }
+    .field-error { border-color:#ef4444!important; box-shadow:0 0 0 2px rgba(239,68,68,0.2)!important; }
+    .field-ok    { border-color:#10b981!important; }
+    .errorlist { color:#fca5a5; font-size:12px; margin-top:5px; list-style:none; padding:0; }
+    .errorlist li::before { content:"⚠ "; }
+    .hint { font-size:11px; margin-top:4px; color:rgba(255,255,255,0.35); min-height:16px; }
+    .auth-btn { width:100%; padding:15px; border-radius:14px; background:linear-gradient(135deg,#8b5cf6,#6366f1); color:white; font-size:15px; font-weight:700; border:none; cursor:pointer; box-shadow:0 8px 30px rgba(139,92,246,0.4); transition:all 0.2s; margin-top:16px; }
+    .auth-btn:hover { transform:translateY(-2px); }
+    .back-link { text-align:center; margin-top:16px; font-size:14px; color:rgba(248,250,252,0.6); }
+    .back-link a { color:#a78bfa; text-decoration:none; font-weight:600; }
+    .logo { text-align:center; margin-bottom:24px; }
+    .logo-icon { width:56px; height:56px; background:linear-gradient(135deg,#8b5cf6,#6366f1); border-radius:16px; display:inline-flex; align-items:center; justify-content:center; font-size:26px; margin-bottom:10px; }
+</style>
+
+<div class="auth-bg">
+  <div class="auth-card">
+    <div class="logo"><div class="logo-icon">👩‍⚕️</div></div>
+    <div class="auth-title">Therapist Registration</div>
+    <div class="auth-subtitle">Create your therapist account to manage patients</div>
+
+    <form method="post" enctype="multipart/form-data" id="therapistRegForm" novalidate>
+      {% csrf_token %}
+      <div class="form-grid">
+
+        <div class="form-group">
+          <label>First Name *</label>
+          <input type="text" name="first_name" id="id_first_name" placeholder="First name" required value="{{ form.first_name.value|default:'' }}">
+          {% if form.first_name.errors %}<ul class="errorlist">{% for e in form.first_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          <div class="hint" id="fn_hint"></div>
+        </div>
+
+        <div class="form-group">
+          <label>Last Name *</label>
+          <input type="text" name="last_name" id="id_last_name" placeholder="Last name" required value="{{ form.last_name.value|default:'' }}">
+          {% if form.last_name.errors %}<ul class="errorlist">{% for e in form.last_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          <div class="hint" id="ln_hint"></div>
+        </div>
+
+        <div class="form-group full">
+          <label>Username *</label>
+          <input type="text" name="username" placeholder="Choose a username" required value="{{ form.username.value|default:'' }}">
+          {% if form.username.errors %}<ul class="errorlist">{% for e in form.username.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+
+        <div class="form-group full">
+          <label>Email *</label>
+          <input type="email" name="email" placeholder="Professional email" required value="{{ form.email.value|default:'' }}">
+          {% if form.email.errors %}<ul class="errorlist">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" name="phone" id="id_phone" placeholder="e.g. 9876543210" maxlength="10" inputmode="numeric" value="{{ form.phone.value|default:'' }}">
+          {% if form.phone.errors %}<ul class="errorlist">{% for e in form.phone.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          <div class="hint" id="phone_hint">10 digits starting with 6, 7, 8 or 9</div>
+        </div>
+
+        <div class="form-group">
+          <label>License Number</label>
+          <input type="text" name="license_number" placeholder="License #" value="{{ form.license_number.value|default:'' }}">
+        </div>
+
+        <div class="form-group">
+          <label>Specialization</label>
+          <input type="text" name="specialization" placeholder="e.g., Stroke Rehabilitation" value="{{ form.specialization.value|default:'' }}">
+        </div>
+
+        <div class="form-group">
+          <label>Qualification</label>
+          <input type="text" name="qualification" placeholder="e.g., M.Sc. SLP" value="{{ form.qualification.value|default:'' }}">
+        </div>
+
+        <div class="form-group full">
+          <label>Years of Experience</label>
+          <input type="number" name="years_experience" placeholder="0" min="0" max="60" value="{{ form.years_experience.value|default:'' }}">
+          {% if form.years_experience.errors %}<ul class="errorlist">{% for e in form.years_experience.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+
+        <div class="form-group full">
+          <label>Profile Picture (optional)</label>
+          <input type="file" name="profile_picture" accept="image/*">
+        </div>
+
+        <div class="form-group">
+          <label>Password *</label>
+          <input type="password" name="password1" id="id_pw1" placeholder="Password" required>
+          {% if form.password1.errors %}<ul class="errorlist">{% for e in form.password1.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+
+        <div class="form-group">
+          <label>Confirm Password *</label>
+          <input type="password" name="password2" id="id_pw2" placeholder="Confirm password" required>
+          {% if form.password2.errors %}<ul class="errorlist">{% for e in form.password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          <div class="hint" id="pw_hint"></div>
+        </div>
+
+      </div>
+      <button type="submit" class="auth-btn">Create Therapist Account →</button>
+    </form>
+    <div class="back-link"><a href="{% url 'accounts:login' %}">← Already have an account? Sign in</a></div>
+  </div>
+</div>
+
+<script>
+// ── Phone validation ──────────────────────────────────────────────
+const phoneEl   = document.getElementById('id_phone');
+const phoneHint = document.getElementById('phone_hint');
+
+function checkPhone(val) {
+    if (!val) {
+        phoneEl.classList.remove('field-error','field-ok');
+        phoneHint.style.color = 'rgba(255,255,255,0.35)';
+        phoneHint.textContent  = '10 digits starting with 6, 7, 8 or 9';
+        return true;
+    }
+    if (val.length < 10) {
+        phoneEl.classList.add('field-error'); phoneEl.classList.remove('field-ok');
+        phoneHint.style.color = '#fca5a5';
+        phoneHint.textContent  = (10 - val.length) + ' more digit(s) needed';
+        return false;
+    }
+    if (!'6789'.includes(val[0])) {
+        phoneEl.classList.add('field-error'); phoneEl.classList.remove('field-ok');
+        phoneHint.style.color = '#fca5a5';
+        phoneHint.textContent  = 'Must start with 6, 7, 8 or 9';
+        return false;
+    }
+    phoneEl.classList.remove('field-error'); phoneEl.classList.add('field-ok');
+    phoneHint.style.color = '#6ee7b7';
+    phoneHint.textContent  = '✓ Valid mobile number';
+    return true;
+}
+
+phoneEl.addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '').slice(0, 10);
+    checkPhone(this.value);
+});
+
+// ── Name letters-only ─────────────────────────────────────────────
+function nameValidator(inputId, hintId) {
+    const inp  = document.getElementById(inputId);
+    const hint = document.getElementById(hintId);
+    inp.addEventListener('input', function () {
+        const clean = this.value.replace(/\s/g, '');
+        if (clean && !/^[a-zA-Z]+$/.test(clean)) {
+            this.classList.add('field-error');
+            hint.style.color = '#fca5a5';
+            hint.textContent  = 'Letters only — no numbers or symbols';
+        } else {
+            this.classList.remove('field-error');
+            hint.textContent = '';
+        }
+    });
+}
+nameValidator('id_first_name', 'fn_hint');
+nameValidator('id_last_name',  'ln_hint');
+
+// ── Password match ────────────────────────────────────────────────
+const pw1    = document.getElementById('id_pw1');
+const pw2    = document.getElementById('id_pw2');
+const pwHint = document.getElementById('pw_hint');
+pw2.addEventListener('input', function () {
+    if (!this.value) { pwHint.textContent = ''; this.classList.remove('field-error','field-ok'); return; }
+    if (pw1.value === this.value) {
+        this.classList.remove('field-error'); this.classList.add('field-ok');
+        pwHint.style.color = '#6ee7b7'; pwHint.textContent = '✓ Passwords match';
+    } else {
+        this.classList.add('field-error'); this.classList.remove('field-ok');
+        pwHint.style.color = '#fca5a5'; pwHint.textContent = 'Passwords do not match';
+    }
+});
+
+// ── Submit guard ──────────────────────────────────────────────────
+document.getElementById('therapistRegForm').addEventListener('submit', function (e) {
+    let ok = true;
+    if (!checkPhone(phoneEl.value)) ok = false;
+    if (pw1.value && pw2.value && pw1.value !== pw2.value) {
+        pw2.classList.add('field-error');
+        pwHint.style.color = '#fca5a5'; pwHint.textContent = 'Passwords do not match';
+        ok = false;
+    }
+    if (!ok) e.preventDefault();
+});
+</script>
+{% endblock %}

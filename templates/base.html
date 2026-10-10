@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SpeechCare{% endblock %} | SpeechCare</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --glass: rgba(255,255,255,0.12);
+            --glass-border: rgba(255,255,255,0.2);
+            --text-primary: #f8fafc;
+            --text-secondary: rgba(248,250,252,0.75);
+            --bg-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* Animated background orbs */
+        body::before, body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+            animation: orb 8s ease-in-out infinite alternate;
+        }
+        body::before {
+            width: 500px; height: 500px;
+            background: var(--primary);
+            top: -100px; left: -100px;
+        }
+        body::after {
+            width: 400px; height: 400px;
+            background: var(--secondary);
+            bottom: -100px; right: -100px;
+            animation-delay: 4s;
+        }
+        @keyframes orb { 0% { transform: scale(1) translate(0,0); } 100% { transform: scale(1.2) translate(30px,30px); } }
+
+        /* Layout */
+        .app-layout { display: flex; min-height: 100vh; position: relative; z-index: 1; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: rgba(15,12,41,0.85);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+            transition: transform 0.3s ease;
+        }
+        .sidebar-brand {
+            padding: 28px 24px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .brand-icon {
+            width: 42px; height: 42px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }
+        .brand-text { font-size: 20px; font-weight: 700; background: linear-gradient(90deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .brand-sub { font-size: 11px; color: var(--text-secondary); }
+
+        .sidebar-nav { padding: 20px 12px; flex: 1; overflow-y: auto; }
+        .nav-section { margin-bottom: 24px; }
+        .nav-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-secondary); padding: 0 12px 8px; }
+
+        .nav-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; border-radius: 12px;
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 14px; font-weight: 500;
+            transition: all 0.2s ease;
+            margin-bottom: 4px;
+        }
+        .nav-link:hover, .nav-link.active {
+            background: var(--glass);
+            color: var(--text-primary);
+            transform: translateX(4px);
+        }
+        .nav-link.active {
+            background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.2));
+            border-left: 3px solid var(--primary);
+            padding-left: 13px;
+        }
+        .nav-link i { width: 20px; text-align: center; font-size: 16px; }
+
+        .sidebar-footer {
+            padding: 16px 12px;
+            border-top: 1px solid var(--glass-border);
+        }
+        .user-card {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px; border-radius: 12px;
+            background: var(--glass);
+        }
+        .user-avatar {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 700;
+            overflow: hidden;
+        }
+        .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .user-info { flex: 1; min-width: 0; }
+        .user-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-role { font-size: 11px; color: var(--text-secondary); text-transform: capitalize; }
+        .logout-btn {
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 16px; padding: 4px;
+            transition: color 0.2s;
+        }
+        .logout-btn:hover { color: var(--danger); }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px;
+            min-height: 100vh;
+        }
+
+        /* Glass cards */
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 24px;
+        }
+
+        /* Stats cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 28px; }
+        .stat-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+        .stat-icon {
+            width: 54px; height: 54px; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+        }
+        .stat-value { font-size: 28px; font-weight: 800; line-height: 1; }
+        .stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+        /* Page header */
+        .page-header { margin-bottom: 28px; }
+        .page-title { font-size: 28px; font-weight: 800; }
+        .page-subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 12px 24px; border-radius: 12px;
+            font-size: 14px; font-weight: 600;
+            cursor: pointer; border: none; text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(99,102,241,0.5); }
+        .btn-glass {
+            background: var(--glass); border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+        }
+        .btn-glass:hover { background: rgba(255,255,255,0.2); }
+        .btn-danger { background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+        .btn-sm { padding: 8px 16px; font-size: 13px; border-radius: 8px; }
+
+        /* Progress bars */
+        .progress-bar-wrapper { margin-bottom: 12px; }
+        .progress-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+        .progress-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 99px; transition: width 1s ease; }
+
+        /* Score badge */
+        .score-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 70px; height: 70px; border-radius: 50%;
+            font-size: 18px; font-weight: 800;
+            background: conic-gradient(var(--primary) 0%, var(--glass) 0%);
+            border: 3px solid var(--glass-border);
+        }
+
+        /* Table */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th {
+            padding: 12px 16px; text-align: left;
+            font-size: 12px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--text-secondary);
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .data-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            font-size: 14px;
+        }
+        .data-table tr:hover td { background: rgba(255,255,255,0.05); }
+
+        /* Alerts */
+        .alert {
+            padding: 14px 18px; border-radius: 12px; margin-bottom: 20px;
+            font-size: 14px; display: flex; align-items: center; gap: 10px;
+        }
+        .alert-success { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+        .alert-error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+
+        /* Forms */
+        .form-group { margin-bottom: 18px; }
+        .form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary); }
+        .form-input {
+            width: 100%; padding: 12px 16px; border-radius: 12px;
+            background: rgba(255,255,255,0.08); border: 1px solid var(--glass-border);
+            color: var(--text-primary); font-size: 14px;
+            transition: border-color 0.2s, background 0.2s;
+            outline: none;
+        }
+        .form-input:focus { border-color: var(--primary); background: rgba(255,255,255,0.12); }
+        .form-input::placeholder { color: rgba(255,255,255,0.3); }
+        select.form-input option { background: #1e1b4b; }
+
+        /* Grid */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+        /* Score color helpers */
+        .score-excellent { color: #10b981; }
+        .score-good { color: #06b6d4; }
+        .score-average { color: #f59e0b; }
+        .score-poor { color: #ef4444; }
+
+        /* Mobile */
+        .hamburger { display: none; position: fixed; top: 16px; left: 16px; z-index: 200; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px; cursor: pointer; color: white; font-size: 18px; }
+        @media (max-width: 768px) {
+            .hamburger { display: flex; }
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; padding: 20px 16px; padding-top: 60px; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if user.is_authenticated %}
+    <button class="hamburger" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">🎙️</div>
+                <div>
+                    <div class="brand-text">SpeechCare</div>
+                    <div class="brand-sub">Therapy Platform</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                {% if user.role == 'patient' %}
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                    <a href="{% url 'patient:dashboard' %}" class="nav-link {% block nav_dashboard %}{% endblock %}"><i class="fas fa-chart-line"></i> Dashboard</a>
+                    <a href="{% url 'practice:home' %}" class="nav-link {% block nav_practice %}{% endblock %}"><i class="fas fa-microphone"></i> Speech Practice</a>
+                    <a href="{% url 'patient:facial_analysis' %}" class="nav-link {% block nav_facial %}{% endblock %}"><i class="fas fa-face-smile"></i> Facial Analysis</a>
+                    <a href="{% url 'patient:exercises' %}" class="nav-link {% block nav_exercises %}{% endblock %}"><i class="fas fa-dumbbell"></i> Exercises</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Analytics</div>
+                    <a href="{% url 'patient:progress' %}" class="nav-link {% block nav_progress %}{% endblock %}"><i class="fas fa-trending-up"></i> Progress</a>
+                    <a href="{% url 'patient:reports' %}" class="nav-link {% block nav_reports %}{% endblock %}"><i class="fas fa-file-chart-column"></i> Reports &amp; Feedback</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Account</div>
+                    <a href="{% url 'patient:profile' %}" class="nav-link {% block nav_profile %}{% endblock %}"><i class="fas fa-user"></i> Profile</a>
+                </div>
+                {% else %}
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                    <a href="{% url 'therapist:dashboard' %}" class="nav-link {% block nav_t_dashboard %}{% endblock %}"><i class="fas fa-users"></i> Dashboard</a>
+                    <a href="{% url 'therapist:manage_exercises' %}" class="nav-link {% block nav_t_exercises %}{% endblock %}"><i class="fas fa-dumbbell"></i> Manage Exercises</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Account</div>
+                    <a href="{% url 'therapist:profile' %}" class="nav-link {% block nav_t_profile %}{% endblock %}"><i class="fas fa-user-md"></i> Profile</a>
+                    <a href="{% url 'subscription:activate' %}" class="nav-link"><i class="fas fa-crown"></i> Subscription</a>
+                </div>
+                {% endif %}
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar">
+                        {% if user.profile_picture %}
+                        <img src="{{ user.profile_picture.url }}" alt="">
+                        {% else %}
+                        {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                        {% endif %}
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+                        <div class="user-role">{{ user.role }}</div>
+                    </div>
+                    <a href="{% url 'accounts:logout' %}" class="logout-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            {% for msg in messages %}
+            <div class="alert alert-{{ msg.tags }}">
+                <i class="fas {% if msg.tags == 'success' %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
+                {{ msg }}
+            </div>
+            {% endfor %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% else %}
+    {% block auth_content %}{% endblock %}
+    {% endif %}
+
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+        // Close sidebar on outside click (mobile)
+        document.addEventListener('click', function(e) {
+            const sidebar = document.getElementById('sidebar');
+            const ham = document.querySelector('.hamburger');
+            if (sidebar && ham && !sidebar.contains(e.target) && !ham.contains(e.target)) {
+                sidebar.classList.remove('open');
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

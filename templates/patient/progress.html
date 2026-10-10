@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Progress{% endblock %}
+{% block nav_progress %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">📈 Progress Tracking</div>
+    <div class="page-subtitle">Your speech therapy journey over time</div>
+</div>
+
+<div class="stats-grid" style="margin-bottom:24px;">
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(99,102,241,0.2);">🎙️</div>
+        <div><div class="stat-value">{{ total_sessions }}</div><div class="stat-label">Total Sessions</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(16,185,129,0.2);">📊</div>
+        <div><div class="stat-value" style="color:#10b981;">{{ avg_accuracy }}%</div><div class="stat-label">Avg Accuracy</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(6,182,212,0.2);">📝</div>
+        <div><div class="stat-value">{{ avg_text }}%</div><div class="stat-label">Avg Text Score</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(139,92,246,0.2);">🔊</div>
+        <div><div class="stat-value">{{ avg_volume }}%</div><div class="stat-label">Avg Volume</div></div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:24px;">
+    <div class="glass-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">📅 Daily Performance (Last 30 Days)</h3>
+        <canvas id="dailyChart" height="230"></canvas>
+    </div>
+    <div class="glass-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">🕸️ Skills Radar</h3>
+        <canvas id="radarChart" height="230"></canvas>
+    </div>
+</div>
+
+<!-- Component Breakdown -->
+<div class="glass-card">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:20px;">🔬 Average Component Scores</h3>
+
+    <div class="progress-bar-wrapper">
+        <div class="progress-label"><span>📝 Text Accuracy</span><span style="font-weight:700;color:#6366f1">{{ avg_text }}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:{{ avg_text }}%;background:linear-gradient(90deg,#6366f1,#818cf8);"></div></div>
+    </div>
+    <div class="progress-bar-wrapper">
+        <div class="progress-label"><span>🔊 Voice Volume</span><span style="font-weight:700;color:#06b6d4">{{ avg_volume }}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:{{ avg_volume }}%;background:linear-gradient(90deg,#06b6d4,#67e8f9);"></div></div>
+    </div>
+    <div class="progress-bar-wrapper">
+        <div class="progress-label"><span>📳 Voice Stability</span><span style="font-weight:700;color:#8b5cf6">{{ avg_stability }}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:{{ avg_stability }}%;background:linear-gradient(90deg,#8b5cf6,#a78bfa);"></div></div>
+    </div>
+    <div class="progress-bar-wrapper">
+        <div class="progress-label"><span>⏱️ Speech Rate</span><span style="font-weight:700;color:#f59e0b">{{ avg_rate }}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:{{ avg_rate }}%;background:linear-gradient(90deg,#f59e0b,#fcd34d);"></div></div>
+    </div>
+    <div class="progress-bar-wrapper">
+        <div class="progress-label"><span>🔔 Clarity</span><span style="font-weight:700;color:#10b981">{{ avg_clarity }}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:{{ avg_clarity }}%;background:linear-gradient(90deg,#10b981,#6ee7b7);"></div></div>
+    </div>
+</div>
+
+<script>
+// Daily chart
+const dCtx = document.getElementById('dailyChart').getContext('2d');
+new Chart(dCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ dates|safe }},
+        datasets: [{
+            label: 'Avg Score',
+            data: {{ scores|safe }},
+            backgroundColor: 'rgba(99,102,241,0.4)',
+            borderColor: '#6366f1',
+            borderWidth: 2,
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: 'rgba(255,255,255,0.5)', callback: v => v + '%' } },
+            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)', maxTicksLimit: 8 } }
+        }
+    }
+});
+
+// Radar chart
+const rCtx = document.getElementById('radarChart').getContext('2d');
+new Chart(rCtx, {
+    type: 'radar',
+    data: {
+        labels: ['Text Accuracy', 'Volume', 'Stability', 'Speech Rate', 'Clarity'],
+        datasets: [{
+            label: 'Your Scores',
+            data: {{ radar_data|safe }},
+            backgroundColor: 'rgba(99,102,241,0.2)',
+            borderColor: '#6366f1',
+            borderWidth: 2,
+            pointBackgroundColor: '#818cf8',
+            pointRadius: 5,
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            r: {
+                min: 0, max: 100,
+                grid: { color: 'rgba(255,255,255,0.1)' },
+                ticks: { color: 'rgba(255,255,255,0.5)', stepSize: 20, backdropColor: 'transparent' },
+                pointLabels: { color: 'rgba(255,255,255,0.7)', font: { size: 12 } }
+            }
+        },
+        plugins: { legend: { display: false } }
+    }
+});
+</script>
+{% endblock %}

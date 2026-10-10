@@ -1,0 +1,329 @@
+{% extends 'base.html' %}
+{% block title %}My Exercises{% endblock %}
+{% block extra_css %}
+<style>
+.exercise-card { transition: transform 0.2s, box-shadow 0.2s; }
+.exercise-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,0,0,0.4); }
+.ex-modal-bg {
+    display:none; position:fixed; inset:0; z-index:9000;
+    background:rgba(8,5,18,0.96); backdrop-filter:blur(16px);
+    align-items:center; justify-content:center; padding:20px;
+}
+.ex-modal-bg.open { display:flex; }
+.ex-modal {
+    background:rgba(22,18,55,0.98); border:1px solid var(--glass-border);
+    border-radius:24px; padding:28px; width:100%; max-width:960px;
+    max-height:90vh; overflow-y:auto;
+    display:grid; grid-template-columns:1.1fr 1fr; gap:24px;
+}
+@media(max-width:700px){ .ex-modal { grid-template-columns:1fr; } }
+.cam-box {
+    position:relative; background:#080614; border-radius:16px;
+    overflow:hidden; aspect-ratio:4/3; border:1px solid var(--glass-border);
+}
+.cam-box video { width:100%; height:100%; object-fit:cover; display:block; }
+.cam-box canvas.ov { position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none; }
+.cam-badge {
+    position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.7);color:#94a3b8;
+    padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,0.12);
+}
+.cam-ph { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,20,0.9); }
+@keyframes flash { 0%,100%{opacity:0;} 50%{opacity:0.9;} }
+.flashEl { position:absolute;inset:0;background:white;animation:flash 0.3s ease forwards;pointer-events:none;z-index:10;display:none; }
+.rep-ring {
+    width:80px;height:80px;border-radius:50%;
+    background:conic-gradient(var(--primary) 0% 0%, rgba(255,255,255,0.08) 0% 100%);
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;font-weight:900;margin:0 auto 10px;border:3px solid rgba(99,102,241,0.3);
+}
+.mbar-row { display:flex;align-items:center;gap:10px;margin-bottom:8px; }
+.mbar-lbl { font-size:12px;color:var(--text-secondary);width:78px;flex-shrink:0; }
+.mbar-trk { flex:1;height:7px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden; }
+.mbar-fill { height:100%;border-radius:99px;transition:width 0.3s; }
+.mbar-val { font-size:12px;font-weight:700;width:36px;text-align:right;flex-shrink:0; }
+.shot-thumb { position:relative;border-radius:10px;overflow:hidden;border:2px solid rgba(99,102,241,0.4);aspect-ratio:4/3;background:#080614;width:80px;flex-shrink:0; }
+.shot-thumb img { width:100%;height:100%;object-fit:cover; }
+.shot-lbl { position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.7);padding:3px;font-size:9px;text-align:center;color:#a5b4fc; }
+.vid-modal-bg { display:none;position:fixed;inset:0;z-index:9500;background:rgba(8,5,18,0.94);backdrop-filter:blur(12px);align-items:center;justify-content:center; }
+.vid-modal-bg.open { display:flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+        <h1 class="page-title">🏋️ Exercise Program</h1>
+        <p class="page-subtitle">
+            Level:
+            {% if severity == 'mild' %}<span style="color:var(--success);font-weight:700;">Mild</span>
+            {% elif severity == 'moderate' %}<span style="color:var(--warning);font-weight:700;">Moderate</span>
+            {% else %}<span style="color:var(--danger);font-weight:700;">Severe</span>{% endif %}
+            &nbsp;·&nbsp; Camera captures a screenshot when you complete each rep
+        </p>
+    </div>
+    <div style="text-align:right;">
+        <div style="font-size:28px;font-weight:800;color:var(--primary);">{{ total_completed }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Total Completed</div>
+    </div>
+</div>
+
+{% if messages %}{% for message in messages %}
+<div class="alert alert-success" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;">✅ {{ message }}</div>
+{% endfor %}{% endif %}
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
+    <span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fcd34d;">😊 Smile</span>
+    <span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.3);color:#67e8f9;">👄 Lip</span>
+    <span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;">🦷 Jaw</span>
+    <span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;">👁️ Eye</span>
+    <span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#c4b5fd;">👅 Tongue</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;">
+{% for exercise in exercises %}
+<div class="glass-card exercise-card" style="padding:0;overflow:hidden;">
+    <div style="padding:16px 18px;
+        {% if exercise.category == 'smile' %}background:linear-gradient(135deg,rgba(245,158,11,0.25),rgba(217,119,6,0.15));border-bottom:1px solid rgba(245,158,11,0.25);
+        {% elif exercise.category == 'lip' %}background:linear-gradient(135deg,rgba(6,182,212,0.25),rgba(8,145,178,0.15));border-bottom:1px solid rgba(6,182,212,0.25);
+        {% elif exercise.category == 'jaw' %}background:linear-gradient(135deg,rgba(16,185,129,0.25),rgba(5,150,105,0.15));border-bottom:1px solid rgba(16,185,129,0.25);
+        {% elif exercise.category == 'eye' %}background:linear-gradient(135deg,rgba(99,102,241,0.25),rgba(79,70,229,0.15));border-bottom:1px solid rgba(99,102,241,0.25);
+        {% else %}background:linear-gradient(135deg,rgba(139,92,246,0.25),rgba(124,58,237,0.15));border-bottom:1px solid rgba(139,92,246,0.25);{% endif %}
+        display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:15px;font-weight:700;">
+            {% if exercise.category == 'smile' %}😊{% elif exercise.category == 'lip' %}👄{% elif exercise.category == 'jaw' %}🦷{% elif exercise.category == 'eye' %}👁️{% else %}👅{% endif %}
+            {{ exercise.title }}
+        </span>
+        <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;
+            {% if exercise.difficulty == 'easy' %}background:rgba(16,185,129,0.2);color:#6ee7b7;border:1px solid rgba(16,185,129,0.3);
+            {% elif exercise.difficulty == 'medium' %}background:rgba(245,158,11,0.2);color:#fcd34d;border:1px solid rgba(245,158,11,0.3);
+            {% else %}background:rgba(239,68,68,0.2);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);{% endif %}">
+            {{ exercise.difficulty|capfirst }}
+        </span>
+    </div>
+    <div style="padding:16px 18px;">
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6;">{{ exercise.description }}</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div style="text-align:center;padding:10px;background:var(--glass);border-radius:10px;border:1px solid var(--glass-border);">
+                <div style="font-size:20px;font-weight:800;color:var(--primary);">{{ exercise.repetitions }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Repetitions</div>
+            </div>
+            <div style="text-align:center;padding:10px;background:var(--glass);border-radius:10px;border:1px solid var(--glass-border);">
+                <div style="font-size:20px;font-weight:800;color:var(--accent);">{{ exercise.duration_seconds }}s</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Hold Duration</div>
+            </div>
+        </div>
+        {% if exercise.video_file %}
+        <button onclick="openVideoFile('{{ exercise.video_file.url }}','{{ exercise.title|escapejs }}')"
+            class="btn btn-glass btn-sm" style="width:100%;justify-content:center;margin-bottom:10px;">▶️ Watch Reference Video</button>
+        {% endif %}
+        {% if exercise.id in completed_exercise_ids %}
+        <div style="text-align:center;padding:11px;border-radius:10px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;font-weight:600;font-size:14px;">✅ Completed Today</div>
+        {% else %}
+        <button onclick="openExModal({{ exercise.id }},'{{ exercise.title|escapejs }}',{{ exercise.repetitions }},{{ exercise.duration_seconds }})"
+            class="btn btn-primary" style="width:100%;justify-content:center;">📷 Start with Camera</button>
+        {% endif %}
+    </div>
+</div>
+{% empty %}
+<div style="grid-column:1/-1;"><div class="glass-card" style="text-align:center;padding:56px;"><div style="font-size:48px;margin-bottom:14px;opacity:0.3;">🏋️</div><p style="color:var(--text-secondary);">No exercises assigned yet.</p></div></div>
+{% endfor %}
+</div>
+
+
+<!-- ── EXERCISE MODAL ─────────────────────────────────────────────── -->
+<div class="ex-modal-bg" id="exModal">
+  <div class="ex-modal">
+
+    <!-- Left: Camera -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 id="exTitle" style="font-size:17px;font-weight:700;"></h3>
+        <button onclick="closeExModal()" style="background:none;border:none;color:var(--text-secondary);font-size:22px;cursor:pointer;">✕</button>
+      </div>
+      <div class="cam-box">
+        <video id="exVid" autoplay muted playsinline></video>
+        <canvas id="exOv" class="ov"></canvas>
+        <div class="flashEl" id="flashEl"></div>
+        <div class="cam-badge" id="exBadge">⬛ Camera Off</div>
+        <div class="cam-ph" id="exPh">
+          <div style="font-size:40px;margin-bottom:8px;">📷</div>
+          <p style="font-size:13px;color:var(--text-secondary);">Camera activates on Start</p>
+        </div>
+      </div>
+      <!-- Thumbnails row -->
+      <div id="thumbRow" style="display:none;margin-top:12px;">
+        <div style="font-size:12px;color:var(--text-secondary);font-weight:600;margin-bottom:8px;">📸 Screenshots Captured</div>
+        <div id="thumbs" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+      </div>
+    </div>
+
+    <!-- Right: Controls -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="text-align:center;padding:18px;background:rgba(99,102,241,0.1);border-radius:16px;border:1px solid rgba(99,102,241,0.2);">
+        <div class="rep-ring" id="repRing">0</div>
+        <div id="repStatus" style="font-size:13px;color:var(--text-secondary);">Press Start to begin</div>
+      </div>
+
+      <div style="padding:14px;background:rgba(255,255,255,0.04);border-radius:12px;border:1px solid var(--glass-border);">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary);margin-bottom:10px;">Live Facial Metrics</div>
+        <div class="mbar-row"><span class="mbar-lbl">😊 Smile</span><div class="mbar-trk"><div class="mbar-fill" id="bSmile" style="width:0%;background:linear-gradient(90deg,var(--primary),var(--secondary));"></div></div><span class="mbar-val" id="vSmile" style="color:var(--primary);">—</span></div>
+        <div class="mbar-row"><span class="mbar-lbl">👄 Lip</span><div class="mbar-trk"><div class="mbar-fill" id="bLip" style="width:0%;background:linear-gradient(90deg,var(--accent),#0891b2);"></div></div><span class="mbar-val" id="vLip" style="color:var(--accent);">—</span></div>
+        <div class="mbar-row"><span class="mbar-lbl">🦷 Jaw</span><div class="mbar-trk"><div class="mbar-fill" id="bJaw" style="width:0%;background:linear-gradient(90deg,var(--success),#059669);"></div></div><span class="mbar-val" id="vJaw" style="color:var(--success);">—</span></div>
+        <div class="mbar-row"><span class="mbar-lbl">💪 Muscle</span><div class="mbar-trk"><div class="mbar-fill" id="bMuscle" style="width:0%;background:linear-gradient(90deg,var(--warning),#d97706);"></div></div><span class="mbar-val" id="vMuscle" style="color:var(--warning);">—</span></div>
+        <div id="weakRow" style="display:none;margin-top:6px;padding:6px 10px;border-radius:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);font-size:11px;color:#fcd34d;">⚠️ Weak side: <strong id="weakSide"></strong></div>
+      </div>
+
+      <div style="text-align:center;padding:12px;background:rgba(99,102,241,0.08);border-radius:12px;border:1px solid rgba(99,102,241,0.2);">
+        <div id="mOverall" style="font-size:32px;font-weight:900;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">—</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Overall Score</div>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button id="btnStart" onclick="startEx()" class="btn btn-primary" style="flex:1;justify-content:center;">▶ Start Exercise</button>
+        <button id="btnRep" onclick="captureRep()" class="btn" style="flex:1;justify-content:center;display:none;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);color:#fcd34d;">📸 Rep Done</button>
+      </div>
+
+      <div id="saveMsg" style="display:none;text-align:center;padding:10px;border-radius:10px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;font-size:13px;font-weight:600;"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Video Modal (HTML5 native player - no YouTube) -->
+<div class="vid-modal-bg" id="vidModal" onclick="if(event.target===this)closeVideo()">
+  <div style="background:rgba(22,18,55,0.98);border:1px solid var(--glass-border);border-radius:24px;padding:28px;width:90%;max-width:760px;position:relative;">
+    <button onclick="closeVideo()" style="position:absolute;top:14px;right:18px;background:none;border:none;color:var(--text-secondary);font-size:22px;cursor:pointer;">✕</button>
+    <h3 id="vidTitle" style="font-size:18px;font-weight:700;margin-bottom:16px;padding-right:30px;"></h3>
+    <video id="vidPlayer" controls autoplay style="width:100%;border-radius:14px;background:#000;max-height:65vh;" preload="metadata">
+      <source id="vidSrc" src="" type="video/mp4">
+      Your browser does not support HTML5 video.
+    </video>
+    <p style="font-size:11px;color:var(--text-secondary);margin-top:8px;text-align:center;">Reference video — max 1 minute duration</p>
+  </div>
+</div>
+
+
+<script>
+var STATE = { exId:null, exTitle:'', totalReps:10, doneReps:0, stream:null, analysisTimer:null, captures:[], live:{ smile:0,lip:0,jaw:0,muscle:0,weak:'none',overall:0 }, active:false };
+
+function openExModal(id,title,reps,dur){ STATE={...STATE,exId:id,exTitle:title,totalReps:reps,doneReps:0,captures:[],active:false}; document.getElementById('exTitle').textContent=title; document.getElementById('repStatus').textContent='Press Start to begin'; document.getElementById('btnStart').style.display='flex'; document.getElementById('btnRep').style.display='none'; document.getElementById('saveMsg').style.display='none'; document.getElementById('thumbRow').style.display='none'; document.getElementById('thumbs').innerHTML=''; resetBars(); updateRing(); document.getElementById('exModal').classList.add('open'); }
+
+function closeExModal(){ stopSession(); document.getElementById('exModal').classList.remove('open'); }
+
+async function startEx(){
+  STATE.doneReps=0; STATE.captures=[]; STATE.active=true;
+  document.getElementById('btnStart').style.display='none';
+  document.getElementById('btnRep').style.display='flex';
+  document.getElementById('repStatus').textContent='Complete rep 1 of '+STATE.totalReps;
+  await startCam();
+  STATE.analysisTimer=setInterval(doFrame,350);
+}
+
+async function startCam(){
+  try{
+    // Use browser default camera — no facingMode so it works on desktop and mobile
+    STATE.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+    var vid=document.getElementById('exVid'); vid.srcObject=STATE.stream;
+    document.getElementById('exPh').style.display='none';
+    document.getElementById('exBadge').textContent='🟢 Live'; document.getElementById('exBadge').style.color='#6ee7b7';
+  }catch(e){ document.getElementById('exBadge').textContent='❌ No Camera'; }
+}
+
+function stopSession(){
+  clearInterval(STATE.analysisTimer); STATE.analysisTimer=null;
+  if(STATE.stream){ STATE.stream.getTracks().forEach(t=>t.stop()); STATE.stream=null; }
+  document.getElementById('exBadge').textContent='⬛ Camera Off'; document.getElementById('exBadge').style.color='#94a3b8';
+  document.getElementById('exPh').style.display='flex'; STATE.active=false;
+}
+
+async function captureRep(){
+  if(!STATE.active) return;
+  var vid=document.getElementById('exVid');
+  var c=document.createElement('canvas'); c.width=vid.videoWidth||640; c.height=vid.videoHeight||480;
+  var ctx=c.getContext('2d'); ctx.drawImage(vid,0,0);
+  // Stamp metrics on screenshot
+  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,c.height-70,c.width,70);
+  ctx.fillStyle='#fff'; ctx.font='bold 14px Segoe UI';
+  ctx.fillText('Rep '+(STATE.doneReps+1)+'/'+STATE.totalReps+' | Score: '+STATE.live.overall+'% | '+new Date().toLocaleTimeString(),12,c.height-48);
+  ctx.fillStyle='#a5b4fc'; ctx.font='12px Segoe UI';
+  ctx.fillText('Smile:'+STATE.live.smile+'%  Lip:'+STATE.live.lip+'%  Jaw:'+STATE.live.jaw+'%  Muscle:'+STATE.live.muscle+'%',12,c.height-22);
+  var dataUrl=c.toDataURL('image/jpeg',0.82);
+  // Flash
+  var fl=document.getElementById('flashEl'); fl.style.display='block'; setTimeout(()=>fl.style.display='none',320);
+  STATE.captures.push({shot:dataUrl,m:{...STATE.live},rep:STATE.doneReps+1});
+  addThumb(dataUrl,STATE.doneReps+1,STATE.live.overall);
+  STATE.doneReps++;
+  updateRing();
+  if(STATE.doneReps>=STATE.totalReps){
+    document.getElementById('repStatus').textContent='🎉 All reps done! Saving...';
+    document.getElementById('btnRep').disabled=true;
+    await saveCompletion(dataUrl);
+  } else {
+    document.getElementById('repStatus').textContent='✅ Rep '+STATE.doneReps+' done — next rep '+(STATE.doneReps+1);
+  }
+}
+
+function addThumb(dataUrl,rep,score){
+  var d=document.createElement('div'); d.className='shot-thumb';
+  d.innerHTML='<img src="'+dataUrl+'"><div class="shot-lbl">Rep '+rep+' · '+score+'%</div>';
+  document.getElementById('thumbs').appendChild(d);
+  document.getElementById('thumbRow').style.display='block';
+}
+
+async function saveCompletion(screenshotDataUrl){
+  var avgScore=STATE.captures.length?Math.round(STATE.captures.reduce((s,c)=>s+c.m.overall,0)/STATE.captures.length):0;
+  var m=STATE.live;
+  try{
+    var r=await fetch('{% url "patient:complete_exercise_with_screenshot" %}',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+      body:JSON.stringify({exercise_id:STATE.exId,screenshot:screenshotDataUrl,score:avgScore,smile:m.smile,jaw:m.jaw,lip:m.lip,muscle:m.muscle,weak_side:m.weak})
+    });
+    var d=await r.json();
+    if(d.success){
+      var msg=document.getElementById('saveMsg');
+      msg.style.display='block'; msg.textContent='✅ Saved! Score: '+avgScore+'%'+(d.has_screenshot?' · Screenshot captured 📸':'');
+      stopSession(); document.getElementById('btnRep').style.display='none';
+      setTimeout(()=>location.reload(),2000);
+    }else{ alert('Error: '+d.error); }
+  }catch(e){ alert('Network error: '+e.message); }
+}
+
+function updateRing(){
+  var pct=STATE.totalReps>0?(STATE.doneReps/STATE.totalReps)*100:0;
+  var r=document.getElementById('repRing');
+  r.style.background='conic-gradient(var(--primary) 0% '+pct+'%, rgba(255,255,255,0.08) '+pct+'% 100%)';
+  r.textContent=STATE.doneReps;
+}
+
+function doFrame(){
+  var vid=document.getElementById('exVid'); var ov=document.getElementById('exOv');
+  if(!vid.videoWidth) return;
+  ov.width=vid.videoWidth; ov.height=vid.videoHeight;
+  var ctx=ov.getContext('2d'); ctx.drawImage(vid,0,0);
+  var img=ctx.getImageData(0,0,ov.width,ov.height); ctx.clearRect(0,0,ov.width,ov.height);
+  var W=ov.width,H=ov.height;
+  var mouth=sampleR(img,W,H,0.30,0.55,0.70,0.75),eye=sampleR(img,W,H,0.25,0.25,0.75,0.45),lc=sampleR(img,W,H,0.10,0.40,0.38,0.65),rc=sampleR(img,W,H,0.62,0.40,0.90,0.65);
+  var jaw=cl(mr(mouth.v,5,80,20,95),0,100),lip=cl(mr(mouth.m*0.4+mouth.v*0.6,30,90,25,95),0,100),cd=Math.abs(lc.m-rc.m),smile=cl(mr(cd,0,30,90,30),0,100),muscle=cl(mr(eye.m,60,160,40,90),0,100);
+  var overall=Math.round(smile*0.35+lip*0.25+jaw*0.25+muscle*0.15),weak=cd>18?(lc.m<rc.m?'left':'right'):'none';
+  STATE.live={smile:Math.round(smile),lip:Math.round(lip),jaw:Math.round(jaw),muscle:Math.round(muscle),overall,weak};
+  setB('bSmile','vSmile',Math.round(smile),'var(--primary)'); setB('bLip','vLip',Math.round(lip),'var(--accent)'); setB('bJaw','vJaw',Math.round(jaw),'var(--success)'); setB('bMuscle','vMuscle',Math.round(muscle),'var(--warning)');
+  document.getElementById('mOverall').textContent=overall+'%';
+  document.getElementById('weakRow').style.display=weak!='none'?'block':'none';
+  if(weak!='none') document.getElementById('weakSide').textContent=weak;
+  // Draw zone guides
+  ctx.strokeStyle='rgba(99,102,241,0.35)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.strokeRect(W*0.30,H*0.55,W*0.40,H*0.20); ctx.strokeStyle='rgba(6,182,212,0.35)';
+  ctx.strokeRect(W*0.25,H*0.25,W*0.50,H*0.20); ctx.setLineDash([]);
+}
+
+function sampleR(img,W,H,x1r,y1r,x2r,y2r){ var x1=~~(x1r*W),x2=~~(x2r*W),y1=~~(y1r*H),y2=~~(y2r*H),s=0,n=0,vs=[]; for(var y=y1;y<y2;y+=4) for(var x=x1;x<x2;x+=4){var i=(y*W+x)*4,b=img.data[i]*0.299+img.data[i+1]*0.587+img.data[i+2]*0.114;s+=b;vs.push(b);n++;} var m=n?s/n:128,vs2=0; vs.forEach(v=>vs2+=(v-m)**2); return{m,v:n?Math.sqrt(vs2/n):0}; }
+function cl(v,a,b){return Math.max(a,Math.min(b,v));} function mr(v,i0,i1,o0,o1){return o0+(o1-o0)*((v-i0)/(i1-i0));}
+function setB(bid,vid,val,col){document.getElementById(bid).style.width=val+'%';document.getElementById(vid).textContent=val+'%';}
+function resetBars(){['bSmile','bLip','bJaw','bMuscle'].forEach(id=>document.getElementById(id).style.width='0%');['vSmile','vLip','vJaw','vMuscle'].forEach(id=>document.getElementById(id).textContent='—');document.getElementById('mOverall').textContent='—';}
+
+function openVideoFile(url,title){ document.getElementById('vidSrc').src=url; document.getElementById('vidPlayer').load(); document.getElementById('vidTitle').textContent=title; document.getElementById('vidModal').classList.add('open'); }
+function closeVideo(){ var p=document.getElementById('vidPlayer'); p.pause(); p.currentTime=0; document.getElementById('vidSrc').src=''; document.getElementById('vidModal').classList.remove('open'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeExModal(); closeVideo(); } });
+</script>
+{% endblock %}

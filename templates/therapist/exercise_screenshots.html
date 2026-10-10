@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% block title %}Exercise Screenshots — {{ patient.get_full_name }}{% endblock %}
+{% block extra_css %}
+<style>
+.lightbox-bg { display:none;position:fixed;inset:0;z-index:9999;background:rgba(5,3,15,0.97);backdrop-filter:blur(14px);align-items:center;justify-content:center;flex-direction:column;gap:16px; }
+.lightbox-bg.open { display:flex; }
+.lightbox-bg img { max-width:90vw;max-height:75vh;border-radius:16px;border:2px solid var(--glass-border); }
+.shot-card { border-radius:14px;overflow:hidden;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);transition:transform 0.2s,box-shadow 0.2s; }
+.shot-card:hover { transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.5); }
+.shot-card img { width:100%;aspect-ratio:4/3;object-fit:cover;display:block;cursor:pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+        <a href="{% url 'therapist:patient_detail' patient.id %}" style="font-size:13px;color:var(--text-secondary);text-decoration:none;">← Back to {{ patient.get_full_name }}</a>
+        <h1 class="page-title" style="margin-top:6px;">📸 Exercise Screenshots</h1>
+        <p class="page-subtitle">Real-time facial captures during exercises for {{ patient.get_full_name }}</p>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;">
+        <div style="text-align:right;">
+            <div style="font-size:24px;font-weight:800;color:var(--primary);">{{ total_with_screenshots }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">With Photos</div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:24px;font-weight:800;color:var(--accent);">{{ total_completions }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Total Completions</div>
+        </div>
+    </div>
+</div>
+
+<!-- Per-exercise stats summary -->
+{% if exercise_stats %}
+<div class="glass-card" style="margin-bottom:24px;">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:14px;">📊 Exercise Summary</h3>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th>Exercise</th><th>Completions</th><th>Avg Score</th><th>With Screenshots</th><th>Last Done</th></tr></thead>
+            <tbody>
+            {% for s in exercise_stats %}
+            <tr>
+                <td style="font-weight:600;">{{ s.exercise.title }}</td>
+                <td><span style="color:var(--primary);font-weight:700;">{{ s.count }}</span></td>
+                <td>
+                    {% if s.avg_score >= 70 %}<span style="color:var(--success);font-weight:700;">{{ s.avg_score }}%</span>
+                    {% elif s.avg_score >= 45 %}<span style="color:var(--warning);font-weight:700;">{{ s.avg_score }}%</span>
+                    {% else %}<span style="color:var(--danger);font-weight:700;">{{ s.avg_score }}%</span>{% endif %}
+                </td>
+                <td>
+                    {% if s.has_screenshots > 0 %}
+                    <span style="color:var(--accent);">📸 {{ s.has_screenshots }}</span>
+                    {% else %}<span style="color:var(--text-secondary);">—</span>{% endif %}
+                </td>
+                <td style="font-size:13px;color:var(--text-secondary);">{{ s.last_done|date:"M d, Y H:i" }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Filter bar -->
+<div class="glass-card" style="margin-bottom:24px;">
+    <form method="get" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px;">Filter by Exercise</label>
+            <select name="exercise" class="form-input" onchange="this.form.submit()">
+                <option value="">All Exercises</option>
+                {% for ex in all_exercises %}
+                <option value="{{ ex.id }}" {% if exercise_filter == ex.id|stringformat:"s" %}selected{% endif %}>{{ ex.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% if exercise_filter %}
+        <a href="{% url 'therapist:exercise_screenshots' patient.id %}" class="btn btn-glass btn-sm">Clear Filter</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Screenshots gallery -->
+{% if with_screenshots %}
+<div style="margin-bottom:12px;">
+    <h3 style="font-size:16px;font-weight:700;">📷 Captured Screenshots ({{ total_with_screenshots }})</h3>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin-bottom:32px;">
+{% for c in with_screenshots %}
+<div class="shot-card">
+    <img src="{{ c.screenshot.url }}" alt="{{ c.exercise.title }} rep" onclick="openLightbox('{{ c.screenshot.url }}','{{ c.exercise.title|escapejs }}','{{ c.completed_at|date:"M d, Y H:i" }}',{{ c.score|floatformat:0 }},{{ c.smile_at_completion|floatformat:0 }},{{ c.lip_at_completion|floatformat:0 }},{{ c.jaw_at_completion|floatformat:0 }},{{ c.muscle_at_completion|floatformat:0 }},'{{ c.weak_side_at_completion }}')">
+    <div style="padding:12px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">{{ c.exercise.title }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">{{ c.completed_at|date:"M d, Y H:i" }}</div>
+        <!-- Mini metric pills -->
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+            <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(99,102,241,0.15);color:#a5b4fc;">😊{{ c.smile_at_completion|floatformat:0 }}%</span>
+            <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(6,182,212,0.15);color:#67e8f9;">👄{{ c.lip_at_completion|floatformat:0 }}%</span>
+            <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(16,185,129,0.15);color:#6ee7b7;">🦷{{ c.jaw_at_completion|floatformat:0 }}%</span>
+            <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(245,158,11,0.15);color:#fcd34d;">💪{{ c.muscle_at_completion|floatformat:0 }}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            {% if c.weak_side_at_completion != 'none' %}
+            <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fcd34d;">⚠️ {{ c.weak_side_at_completion|capfirst }}</span>
+            {% else %}
+            <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;">✅ Symmetric</span>
+            {% endif %}
+            <span style="font-size:14px;font-weight:800;{% if c.score >= 70 %}color:var(--success);{% elif c.score >= 45 %}color:var(--warning);{% else %}color:var(--danger);{% endif %}">{{ c.score|floatformat:0 }}%</span>
+        </div>
+    </div>
+</div>
+{% endfor %}
+</div>
+
+{% else %}
+<div class="glass-card" style="text-align:center;padding:56px;">
+    <div style="font-size:48px;margin-bottom:14px;opacity:0.3;">📸</div>
+    <p style="color:var(--text-secondary);">No screenshots yet.</p>
+    <p style="font-size:13px;color:var(--text-secondary);margin-top:6px;">Screenshots are captured when the patient completes exercise reps using the camera feature.</p>
+</div>
+{% endif %}
+
+
+<!-- All completions table (no screenshot required) -->
+{% if completions %}
+<div class="glass-card">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;">📋 All Exercise Completions</h3>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th>Date</th><th>Exercise</th><th>Score</th><th>Smile</th><th>Lip</th><th>Jaw</th><th>Weak Side</th><th>Screenshot</th></tr></thead>
+            <tbody>
+            {% for c in completions %}
+            <tr>
+                <td style="font-size:13px;color:var(--text-secondary);">{{ c.completed_at|date:"M d H:i" }}</td>
+                <td style="font-weight:600;">{{ c.exercise.title }}</td>
+                <td>{% if c.score >= 70 %}<span style="color:var(--success);font-weight:700;">{{ c.score|floatformat:0 }}%</span>{% elif c.score >= 45 %}<span style="color:var(--warning);font-weight:700;">{{ c.score|floatformat:0 }}%</span>{% else %}<span style="color:var(--danger);font-weight:700;">{{ c.score|floatformat:0 }}%</span>{% endif %}</td>
+                <td style="color:#a5b4fc;font-size:13px;">{{ c.smile_at_completion|floatformat:0 }}%</td>
+                <td style="color:#67e8f9;font-size:13px;">{{ c.lip_at_completion|floatformat:0 }}%</td>
+                <td style="color:#6ee7b7;font-size:13px;">{{ c.jaw_at_completion|floatformat:0 }}%</td>
+                <td>{% if c.weak_side_at_completion != 'none' %}<span style="color:#fcd34d;font-size:12px;">⚠️ {{ c.weak_side_at_completion|capfirst }}</span>{% else %}<span style="color:#6ee7b7;font-size:12px;">✅ Good</span>{% endif %}</td>
+                <td>{% if c.screenshot %}<span style="color:var(--accent);font-size:12px;">📸 Yes</span>{% else %}<span style="color:var(--text-secondary);font-size:12px;">—</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+
+
+<!-- ── Facial Analysis Screenshots ───────────────────────────────── -->
+{% if facial_sessions_with_shots %}
+<div class="glass-card" style="margin-top:28px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+        <span style="font-size:20px;">🧠</span>
+        <h3 style="font-size:16px;font-weight:700;">Facial Analysis Session Screenshots</h3>
+        <span style="margin-left:auto;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#c4b5fd;">{{ facial_sessions_with_shots|length }} sessions</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;">
+    {% for fs in facial_sessions_with_shots %}
+    <div class="shot-card">
+        <img src="{{ fs.screenshot.url }}" alt="Facial session" onclick="openLightbox('{{ fs.screenshot.url }}','Facial Session','{{ fs.session_date|date:"M d, Y H:i" }}',{{ fs.overall_score|floatformat:0 }},{{ fs.smile_symmetry|floatformat:0 }},{{ fs.lip_movement|floatformat:0 }},{{ fs.jaw_opening|floatformat:0 }},{{ fs.muscle_strength|floatformat:0 }},'{{ fs.weak_side }}')">
+        <div style="padding:12px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Facial Analysis</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">{{ fs.session_date|date:"M d, Y H:i" }}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+                <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(99,102,241,0.15);color:#a5b4fc;">😊{{ fs.smile_symmetry|floatformat:0 }}%</span>
+                <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(6,182,212,0.15);color:#67e8f9;">👄{{ fs.lip_movement|floatformat:0 }}%</span>
+                <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:rgba(16,185,129,0.15);color:#6ee7b7;">🦷{{ fs.jaw_opening|floatformat:0 }}%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                {% if fs.weak_side != 'none' %}
+                <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fcd34d;">⚠️ {{ fs.weak_side|capfirst }}</span>
+                {% else %}
+                <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;">✅ Symmetric</span>
+                {% endif %}
+                <span style="font-size:15px;font-weight:800;{% if fs.overall_score >= 70 %}color:var(--success);{% elif fs.overall_score >= 45 %}color:var(--warning);{% else %}color:var(--danger);{% endif %}">{{ fs.overall_score|floatformat:0 }}%</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="glass-card" style="margin-top:28px;text-align:center;padding:40px;">
+    <div style="font-size:36px;margin-bottom:10px;opacity:0.3;">🧠</div>
+    <p style="color:var(--text-secondary);">No facial analysis screenshots yet for this patient.</p>
+    <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Screenshots are captured automatically during facial analysis sessions.</p>
+</div>
+{% endif %}
+
+<!-- Lightbox -->
+<div class="lightbox-bg" id="lightbox" onclick="if(event.target===this)closeLB()">
+    <button onclick="closeLB()" style="position:fixed;top:20px;right:24px;background:none;border:none;color:white;font-size:28px;cursor:pointer;z-index:10001;">✕</button>
+    <img id="lbImg" src="" alt="">
+    <div id="lbInfo" style="text-align:center;max-width:600px;">
+        <div id="lbTitle" style="font-size:16px;font-weight:700;margin-bottom:6px;"></div>
+        <div id="lbDate" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;"></div>
+        <div id="lbMetrics" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;"></div>
+    </div>
+</div>
+
+<script>
+function openLightbox(url,title,date,score,smile,lip,jaw,muscle,weak){
+    document.getElementById('lbImg').src=url;
+    document.getElementById('lbTitle').textContent=title+' — Score: '+score+'%';
+    document.getElementById('lbDate').textContent=date;
+    var m=document.getElementById('lbMetrics');
+    m.innerHTML='<span style="padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700;background:rgba(99,102,241,0.2);color:#a5b4fc;">😊 Smile '+smile+'%</span>'
+        +'<span style="padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700;background:rgba(6,182,212,0.2);color:#67e8f9;">👄 Lip '+lip+'%</span>'
+        +'<span style="padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700;background:rgba(16,185,129,0.2);color:#6ee7b7;">🦷 Jaw '+jaw+'%</span>'
+        +'<span style="padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700;background:rgba(245,158,11,0.2);color:#fcd34d;">💪 Muscle '+muscle+'%</span>'
+        +(weak!='none'?'<span style="padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700;background:rgba(239,68,68,0.2);color:#fca5a5;">⚠️ Weak: '+weak+'</span>':'<span style="padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700;background:rgba(16,185,129,0.2);color:#6ee7b7;">✅ Symmetric</span>');
+    document.getElementById('lightbox').classList.add('open');
+}
+function closeLB(){ document.getElementById('lightbox').classList.remove('open'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeLB(); });
+</script>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block title %}Manage Exercises{% endblock %}
+{% block extra_css %}
+<style>
+.ex-table td, .ex-table th { vertical-align: middle; }
+.video-preview { width: 120px; border-radius: 8px; }
+.form-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 18px; padding: 28px; margin-bottom: 28px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">🎬 Manage Exercises</h1>
+    <p class="page-subtitle">Upload reference videos (max 1 minute) and manage facial exercise library</p>
+</div>
+
+{% if messages %}{% for message in messages %}
+<div class="alert alert-success" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;padding:14px 18px;border-radius:12px;margin-bottom:18px;">✅ {{ message }}</div>
+{% endfor %}{% endif %}
+
+<!-- Add Exercise Form -->
+<div class="form-card">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:18px;">➕ Add New Exercise</h3>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div>
+                <label style="font-size:12px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">Exercise Title *</label>
+                <input type="text" name="title" required class="form-control" placeholder="e.g. Smile Hold" style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);border-radius:10px;color:#fff;font-size:14px;">
+            </div>
+            <div>
+                <label style="font-size:12px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">Category *</label>
+                <select name="category" class="form-control" style="width:100%;padding:10px 14px;background:rgba(22,18,55,0.95);border:1px solid var(--glass-border);border-radius:10px;color:#fff;font-size:14px;">
+                    <option value="smile">😊 Smile Training</option>
+                    <option value="lip">👄 Lip Exercises</option>
+                    <option value="jaw">🦷 Jaw Exercises</option>
+                    <option value="eye">👁️ Eye Exercises</option>
+                    <option value="tongue">👅 Tongue Exercises</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:12px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">Difficulty *</label>
+                <select name="difficulty" class="form-control" style="width:100%;padding:10px 14px;background:rgba(22,18,55,0.95);border:1px solid var(--glass-border);border-radius:10px;color:#fff;font-size:14px;">
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                    <label style="font-size:12px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">Duration (seconds)</label>
+                    <input type="number" name="duration_seconds" value="30" min="5" max="300" class="form-control" style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);border-radius:10px;color:#fff;font-size:14px;">
+                </div>
+                <div>
+                    <label style="font-size:12px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">Repetitions</label>
+                    <input type="number" name="repetitions" value="10" min="1" max="50" class="form-control" style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);border-radius:10px;color:#fff;font-size:14px;">
+                </div>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label style="font-size:12px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">Description *</label>
+                <textarea name="description" required rows="3" placeholder="Describe the exercise steps..." style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);border-radius:10px;color:#fff;font-size:14px;resize:vertical;"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label style="font-size:12px;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:6px;">
+                    🎬 Reference Video <span style="color:var(--accent);">(Direct upload, max 1 minute / 50 MB — MP4 preferred)</span>
+                </label>
+                <div style="border:2px dashed rgba(99,102,241,0.4);border-radius:12px;padding:20px;text-align:center;cursor:pointer;" onclick="document.getElementById('videoInput').click()">
+                    <div style="font-size:32px;margin-bottom:8px;">📹</div>
+                    <div style="font-size:13px;color:var(--text-secondary);">Click to select video file (MP4, MOV, WebM)</div>
+                    <div id="videoName" style="font-size:12px;color:var(--accent);margin-top:6px;"></div>
+                    <input type="file" id="videoInput" name="video_file" accept="video/*" style="display:none;" onchange="showVideoName(this)">
+                </div>
+                <video id="videoPreview" controls style="display:none;width:100%;border-radius:10px;margin-top:12px;max-height:200px;"></video>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:18px;">➕ Add Exercise</button>
+    </form>
+</div>
+
+<!-- Exercise List -->
+<div class="glass-card">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:18px;">📋 Exercise Library ({{ exercises.count }})</h3>
+    <div style="overflow-x:auto;">
+        <table class="data-table ex-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Difficulty</th>
+                    <th>Reps / Duration</th>
+                    <th>Video</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for ex in exercises %}
+            <tr>
+                <td style="font-weight:600;max-width:200px;">{{ ex.title }}</td>
+                <td>
+                    {% if ex.category == 'smile' %}😊{% elif ex.category == 'lip' %}👄{% elif ex.category == 'jaw' %}🦷{% elif ex.category == 'eye' %}👁️{% else %}👅{% endif %}
+                    {{ ex.get_category_display }}
+                </td>
+                <td>
+                    <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;
+                        {% if ex.difficulty == 'easy' %}background:rgba(16,185,129,0.2);color:#6ee7b7;
+                        {% elif ex.difficulty == 'medium' %}background:rgba(245,158,11,0.2);color:#fcd34d;
+                        {% else %}background:rgba(239,68,68,0.2);color:#fca5a5;{% endif %}">
+                        {{ ex.difficulty|capfirst }}
+                    </span>
+                </td>
+                <td>{{ ex.repetitions }} × {{ ex.duration_seconds }}s</td>
+                <td>
+                    {% if ex.video_file %}
+                    <video class="video-preview" controls preload="none">
+                        <source src="{{ ex.video_file.url }}" type="video/mp4">
+                    </video>
+                    {% else %}
+                    <span style="color:var(--text-secondary);font-size:12px;">No video</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if ex.is_active %}
+                    <span style="color:var(--success);font-size:12px;font-weight:600;">✅ Active</span>
+                    {% else %}
+                    <span style="color:var(--danger);font-size:12px;font-weight:600;">❌ Inactive</span>
+                    {% endif %}
+                </td>
+                <td style="display:flex;gap:8px;align-items:center;">
+                    <form method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="toggle">
+                        <input type="hidden" name="exercise_id" value="{{ ex.id }}">
+                        <button type="submit" class="btn btn-glass btn-sm">
+                            {% if ex.is_active %}Deactivate{% else %}Activate{% endif %}
+                        </button>
+                    </form>
+                    <form method="post" style="display:inline;" onsubmit="return confirm('Delete this exercise?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="exercise_id" value="{{ ex.id }}">
+                        <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#fca5a5;">🗑️ Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:32px;">No exercises yet. Add one above.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function showVideoName(input) {
+    var file = input.files[0];
+    if (file) {
+        document.getElementById('videoName').textContent = '📹 ' + file.name + ' (' + (file.size/1048576).toFixed(1) + ' MB)';
+        var preview = document.getElementById('videoPreview');
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+        // Warn if too large
+        if (file.size > 52428800) {
+            alert('Warning: File is larger than 50 MB. Please trim to 1 minute or compress the video.');
+        }
+    }
+}
+</script>
+{% endblock %}

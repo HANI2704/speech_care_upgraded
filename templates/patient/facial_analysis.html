@@ -1,0 +1,455 @@
+{% extends 'base.html' %}
+{% block title %}Facial Analysis{% endblock %}
+{% block extra_css %}
+<style>
+@keyframes pulse-live { 0%,100%{opacity:1;box-shadow:0 0 6px var(--success);} 50%{opacity:0.4;box-shadow:none;} }
+.live-dot { width:10px;height:10px;border-radius:50%;background:var(--success);animation:pulse-live 2s infinite; }
+.cam-wrap { position:relative;background:#050310;border-radius:16px;overflow:hidden;aspect-ratio:16/9;border:1px solid var(--glass-border); }
+.cam-wrap video { width:100%;height:100%;object-fit:cover;display:block; }
+.cam-wrap canvas.ov { position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none; }
+.cam-badge { position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.7);color:#94a3b8;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,0.12); }
+.cam-placeholder { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(5,3,16,0.92); }
+.shot-strip { display:flex;gap:8px;flex-wrap:wrap;margin-top:10px; }
+.shot-mini { width:70px;aspect-ratio:4/3;border-radius:8px;overflow:hidden;border:2px solid rgba(99,102,241,0.35);flex-shrink:0;cursor:pointer; }
+.shot-mini img { width:100%;height:100%;object-fit:cover; }
+.fbar-wrap { margin-bottom:10px; }
+.fbar-label { display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px; }
+.fbar { height:7px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden; }
+.fbar-fill { height:100%;border-radius:99px;transition:width 0.3s ease; }
+/* Lightbox */
+.lb-bg { display:none;position:fixed;inset:0;z-index:9999;background:rgba(3,1,10,0.97);backdrop-filter:blur(14px);align-items:center;justify-content:center;flex-direction:column;gap:14px; }
+.lb-bg.open { display:flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div>
+        <h1 class="page-title">🧠 Facial Analysis</h1>
+        <p class="page-subtitle">Live facial muscle & symmetry tracking — screenshots saved automatically</p>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(99,102,241,0.2);">😊</div>
+        <div><div class="stat-value" style="color:var(--primary);">{{ avg_smile }}%</div><div class="stat-label">Avg Smile</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(16,185,129,0.2);">🦷</div>
+        <div><div class="stat-value" style="color:var(--success);">{{ avg_jaw }}%</div><div class="stat-label">Avg Jaw</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(245,158,11,0.2);">⭐</div>
+        <div><div class="stat-value" style="color:var(--warning);">{{ avg_overall }}%</div><div class="stat-label">Avg Score</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(6,182,212,0.2);">📸</div>
+        <div><div class="stat-value" style="color:var(--accent);">{{ total_sessions }}</div><div class="stat-label">Sessions Done</div></div>
+    </div>
+</div>
+
+<!-- Live Camera + Metrics -->
+<div class="glass-card" style="margin-bottom:24px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+        <div class="live-dot" id="liveDot" style="background:var(--text-secondary);animation:none;"></div>
+        <h3 style="font-size:17px;font-weight:700;">Live Facial Analysis</h3>
+        <span id="sessionTimer" style="margin-left:auto;font-size:20px;font-weight:800;color:var(--primary);display:none;"></span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:22px;align-items:start;">
+
+        <!-- Camera -->
+        <div>
+            <div class="cam-wrap">
+                <video id="vid" autoplay muted playsinline></video>
+                <canvas id="ov" class="ov"></canvas>
+                <div class="cam-badge" id="camBadge">⬛ Camera Off</div>
+                <div class="cam-placeholder" id="camPh">
+                    <div style="font-size:48px;margin-bottom:12px;">📷</div>
+                    <p style="color:var(--text-secondary);font-size:13px;">Camera uses your browser's default camera</p>
+                    <p style="color:var(--text-secondary);font-size:12px;margin-top:4px;">Click Start to activate</p>
+                </div>
+            </div>
+
+            <!-- Captured screenshots this session -->
+            <div id="shotSection" style="display:none;margin-top:12px;">
+                <div style="font-size:12px;color:var(--text-secondary);font-weight:600;margin-bottom:6px;">📸 Auto-Captured Screenshots (click to enlarge)</div>
+                <div class="shot-strip" id="shotStrip"></div>
+            </div>
+
+            <!-- Controls -->
+            <div style="display:flex;gap:12px;margin-top:14px;">
+                <button id="startBtn" onclick="startSession()" class="btn btn-primary" style="flex:1;justify-content:center;">
+                    <i class="fas fa-play"></i> Start Analysis
+                </button>
+                <button id="stopBtn" onclick="stopSession()" style="flex:1;display:none;justify-content:center;" class="btn" style="background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:#fca5a5;">
+                    <i class="fas fa-stop"></i> Stop & Save
+                </button>
+            </div>
+            <div id="saveMsg" style="display:none;margin-top:10px;text-align:center;padding:10px;border-radius:10px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;font-size:13px;font-weight:600;"></div>
+        </div>
+
+        <!-- Real-time metrics -->
+        <div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary);margin-bottom:14px;">Real-time Measurements</div>
+
+            <div class="fbar-wrap">
+                <div class="fbar-label"><span>😊 Smile Symmetry</span><span id="vSmile" style="color:var(--primary);font-weight:700;">—</span></div>
+                <div class="fbar"><div class="fbar-fill" id="bSmile" style="width:0%;background:linear-gradient(90deg,var(--primary),var(--secondary));"></div></div>
+            </div>
+            <div class="fbar-wrap">
+                <div class="fbar-label"><span>👄 Lip Movement</span><span id="vLip" style="color:var(--accent);font-weight:700;">—</span></div>
+                <div class="fbar"><div class="fbar-fill" id="bLip" style="width:0%;background:linear-gradient(90deg,var(--accent),#0891b2);"></div></div>
+            </div>
+            <div class="fbar-wrap">
+                <div class="fbar-label"><span>🦷 Jaw Opening</span><span id="vJaw" style="color:var(--success);font-weight:700;">—</span></div>
+                <div class="fbar"><div class="fbar-fill" id="bJaw" style="width:0%;background:linear-gradient(90deg,var(--success),#059669);"></div></div>
+            </div>
+            <div class="fbar-wrap">
+                <div class="fbar-label"><span>💪 Muscle Strength</span><span id="vMuscle" style="color:var(--warning);font-weight:700;">—</span></div>
+                <div class="fbar"><div class="fbar-fill" id="bMuscle" style="width:0%;background:linear-gradient(90deg,var(--warning),#d97706);"></div></div>
+            </div>
+            <div class="fbar-wrap">
+                <div class="fbar-label"><span>👁️ Eye Blink Rate</span><span id="vBlink" style="color:#a78bfa;font-weight:700;">—</span></div>
+                <div class="fbar"><div class="fbar-fill" id="bBlink" style="width:0%;background:linear-gradient(90deg,#a78bfa,#7c3aed);"></div></div>
+            </div>
+
+            <div style="height:1px;background:var(--glass-border);margin:14px 0;"></div>
+
+            <div id="weakAlert" style="display:none;padding:8px 12px;border-radius:10px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);font-size:12px;color:#fcd34d;margin-bottom:12px;">
+                ⚠️ Weak side detected: <strong id="weakText"></strong>
+            </div>
+
+            <!-- Overall score + screenshot count -->
+            <div style="text-align:center;padding:18px;background:rgba(99,102,241,0.08);border-radius:14px;border:1px solid rgba(99,102,241,0.2);">
+                <div id="vOverall" style="font-size:44px;font-weight:900;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">—</div>
+                <div style="color:var(--text-secondary);font-size:13px;">Overall Score</div>
+                <div id="shotCount" style="margin-top:8px;font-size:12px;color:var(--accent);display:none;">📸 <strong id="shotNum">0</strong> screenshots captured</div>
+                <div id="vReps" style="display:none;margin-top:6px;font-size:12px;color:var(--accent);">💡 Suggested: <strong id="repsNum"></strong> reps/exercise</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Past Sessions Table -->
+{% if facial_sessions %}
+<div class="glass-card">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:18px;">📋 Session History</h3>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr><th>Date & Time</th><th>Smile</th><th>Jaw</th><th>Lip</th><th>Muscle</th><th>Weak Side</th><th>Score</th><th>Accuracy %</th><th>Screenshot</th></tr>
+            </thead>
+            <tbody>
+            {% for fs in facial_sessions %}
+            <tr>
+                <td style="font-size:13px;color:var(--text-secondary);">{{ fs.session_date|date:"M d, Y H:i" }}</td>
+                <td><span style="color:var(--primary);font-weight:600;">{{ fs.smile_symmetry|floatformat:0 }}%</span></td>
+                <td><span style="color:var(--success);font-weight:600;">{{ fs.jaw_opening|floatformat:0 }}%</span></td>
+                <td><span style="color:var(--accent);font-weight:600;">{{ fs.lip_movement|floatformat:0 }}%</span></td>
+                <td><span style="color:var(--warning);font-weight:600;">{{ fs.muscle_strength|floatformat:0 }}%</span></td>
+                <td>
+                    {% if fs.weak_side == 'none' %}<span style="color:var(--success);font-size:12px;">✅ None</span>
+                    {% else %}<span style="color:var(--warning);font-size:12px;">⚠️ {{ fs.weak_side|capfirst }}</span>{% endif %}
+                </td>
+                <td>
+                    {% if fs.overall_score >= 70 %}<span style="color:var(--success);font-weight:700;">{{ fs.overall_score|floatformat:0 }}%</span>
+                    {% elif fs.overall_score >= 45 %}<span style="color:var(--warning);font-weight:700;">{{ fs.overall_score|floatformat:0 }}%</span>
+                    {% else %}<span style="color:var(--danger);font-weight:700;">{{ fs.overall_score|floatformat:0 }}%</span>{% endif %}
+                </td>
+                <td>
+                    {% if fs.accuracy_percentage > 0 %}
+                    <span style="font-size:15px;font-weight:800;
+                        {% if fs.accuracy_percentage >= 70 %}color:var(--success);{% elif fs.accuracy_percentage >= 45 %}color:var(--warning);{% else %}color:var(--danger);{% endif %}">
+                        {{ fs.accuracy_percentage|floatformat:1 }}%
+                    </span>
+                    {% else %}
+                    <span style="color:var(--text-secondary);font-size:12px;">{{ fs.computed_accuracy }}%</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if fs.screenshot %}
+                    <img src="{{ fs.screenshot.url }}" style="width:60px;aspect-ratio:4/3;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid rgba(99,102,241,0.4);"
+                         onclick="openLB('{{ fs.screenshot.url }}')">
+                    {% else %}
+                    <span style="color:var(--text-secondary);font-size:12px;">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="glass-card" style="text-align:center;padding:48px;">
+    <div style="font-size:48px;margin-bottom:12px;opacity:0.3;">📷</div>
+    <p style="color:var(--text-secondary);">No facial sessions yet. Start your first analysis above!</p>
+</div>
+{% endif %}
+
+<!-- Lightbox -->
+<div class="lb-bg" id="lb" onclick="if(event.target===this)closeLB()">
+    <button onclick="closeLB()" style="position:fixed;top:18px;right:22px;background:none;border:none;color:white;font-size:26px;cursor:pointer;">✕</button>
+    <img id="lbImg" src="" style="max-width:90vw;max-height:78vh;border-radius:14px;border:2px solid var(--glass-border);">
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────
+var S = {
+    stream: null,
+    analysisTimer: null,
+    timerInterval: null,
+    shotTimer: null,
+    seconds: 0,
+    active: false,
+    readings: { smile:[], lip:[], jaw:[], muscle:[] },
+    weakCount: { left:0, right:0, none:0 },
+    live: { smile:0, lip:0, jaw:0, muscle:0, weak:'none', overall:0 },
+    shots: [],             // base64 screenshots captured this session
+    lastShot: null,        // most recent screenshot dataURL
+    shotInterval: 15,      // auto-capture every 15 seconds
+    nextShotIn: 15,
+};
+
+// ─── Start Session ───────────────────────────────────
+async function startSession() {
+    S.readings = { smile:[], lip:[], jaw:[], muscle:[] };
+    S.weakCount = { left:0, right:0, none:0 };
+    S.shots = []; S.lastShot = null; S.seconds = 0; S.nextShotIn = S.shotInterval;
+    document.getElementById('shotStrip').innerHTML = '';
+    document.getElementById('shotSection').style.display = 'none';
+    document.getElementById('shotCount').style.display = 'none';
+    document.getElementById('saveMsg').style.display = 'none';
+
+    // USE BROWSER DEFAULT CAMERA — no facingMode or resolution constraints
+    try {
+        S.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    } catch(e) {
+        try {
+            // Fallback: no constraints at all
+            S.stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch(e2) {
+            alert('Camera access denied.\n\nPlease allow camera access in your browser:\n• Chrome: click the camera icon in the address bar\n• Firefox: click the camera icon and choose "Allow"\n• Edge: click the lock icon → Camera → Allow');
+            return;
+        }
+    }
+
+    
+
+    // Important fix
+    /*vid.onloadedmetadata = function () {
+        vid.play().catch(function(err){
+            console.log("Play error:", err);
+        });
+    };*/
+    var vid = document.getElementById('vid');
+    vid.srcObject = S.stream;
+    document.getElementById('camPh').style.display = 'none';
+    document.getElementById('camBadge').textContent = '🟢 Live';
+    document.getElementById('camBadge').style.color = '#6ee7b7';
+    document.getElementById('liveDot').style.background = 'var(--success)';
+    document.getElementById('liveDot').style.animation = 'pulse-live 2s infinite';
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'flex';
+    document.getElementById('sessionTimer').style.display = 'block';
+    S.active = true;
+
+    // Start analysis loop
+    S.analysisTimer = setInterval(doFrame, 350);
+
+    // Timer
+    S.timerInterval = setInterval(function(){
+        S.seconds++;
+        var m = String(Math.floor(S.seconds/60)).padStart(2,'0');
+        var sec = String(S.seconds%60).padStart(2,'0');
+        document.getElementById('sessionTimer').textContent = m + ':' + sec;
+
+        // Auto screenshot every N seconds
+        S.nextShotIn--;
+        if (S.nextShotIn <= 0) {
+            captureScreenshot(false);  // silent (no flash)
+            S.nextShotIn = S.shotInterval;
+        }
+    }, 1000);
+}
+
+// ─── Stop & Save ─────────────────────────────────────
+async function stopSession() {
+    if (!S.active) return;
+    S.active = false;
+    clearInterval(S.analysisTimer);
+    clearInterval(S.timerInterval);
+
+    // Final screenshot
+    captureScreenshot(true);  // with flash
+
+    // Stop stream
+    if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); S.stream = null; }
+    document.getElementById('camBadge').textContent = '⬛ Saved';
+    document.getElementById('camBadge').style.color = '#94a3b8';
+    document.getElementById('camPh').style.display = 'flex';
+    document.getElementById('liveDot').style.background = 'var(--text-secondary)';
+    document.getElementById('liveDot').style.animation = 'none';
+    document.getElementById('stopBtn').style.display = 'none';
+    document.getElementById('startBtn').style.display = 'flex';
+    document.getElementById('sessionTimer').style.display = 'none';
+
+    // Compute averages
+    var avg = function(arr) { return arr.length ? Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length) : 0; };
+    var dominated = Object.entries(S.weakCount).sort(function(a,b){return b[1]-a[1];})[0][0];
+    var overall = Math.round(avg(S.readings.smile)*0.35 + avg(S.readings.lip)*0.25 + avg(S.readings.jaw)*0.25 + avg(S.readings.muscle)*0.15);
+    var reps = overall < 55 ? 15 : overall < 75 ? 12 : 10;
+
+    // Build payload — send last/best screenshot
+    var payload = {
+        smile_symmetry:  avg(S.readings.smile),
+        lip_movement:    avg(S.readings.lip),
+        jaw_opening:     avg(S.readings.jaw),
+        muscle_strength: avg(S.readings.muscle),
+        eye_blink_rate:  15,
+        overall_score:   overall,
+        weak_side:       dominated,
+        suggested_reps:  reps,
+        duration_seconds: S.seconds,
+        screenshot:      S.lastShot || '',
+    };
+
+    try {
+        var resp = await fetch('{% url "patient:save_facial_session" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify(payload)
+        });
+        var data = await resp.json();
+        var msg = document.getElementById('saveMsg');
+        if (data.status === 'ok') {
+            msg.style.display = 'block';
+            msg.textContent = '✅ Session saved! Accuracy: ' + (data.accuracy_percentage || overall) + '%' + (data.has_screenshot ? ' · Screenshot captured 📸' : '');
+            setTimeout(function(){ location.reload(); }, 2500);
+        } else {
+            msg.style.display = 'block';
+            msg.style.background = 'rgba(239,68,68,0.15)';
+            msg.style.color = '#fca5a5';
+            msg.textContent = 'Error saving: ' + data.message;
+        }
+    } catch(e) {
+        var msg = document.getElementById('saveMsg');
+        msg.style.display = 'block';
+        msg.style.background = 'rgba(239,68,68,0.15)';
+        msg.style.color = '#fca5a5';
+        msg.textContent = 'Network error: ' + e.message;
+    }
+}
+
+// ─── Capture Screenshot ──────────────────────────────
+function captureScreenshot(withFlash) {
+    var vid = document.getElementById('vid');
+    if (!vid.videoWidth) return;
+
+    var c = document.createElement('canvas');
+    c.width = vid.videoWidth; c.height = vid.videoHeight;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(vid, 0, 0);
+
+    // Stamp metrics + timestamp
+    var overall = S.live.overall;
+    ctx.fillStyle = 'rgba(0,0,0,0.62)';
+    ctx.fillRect(0, c.height - 70, c.width, 70);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 14px Segoe UI, sans-serif';
+    ctx.fillText(
+        'Score: ' + overall + '% | ' + new Date().toLocaleTimeString() + ' | ' + formatTime(S.seconds),
+        12, c.height - 48
+    );
+    ctx.fillStyle = '#a5b4fc'; ctx.font = '12px Segoe UI, sans-serif';
+    ctx.fillText(
+        'Smile:' + S.live.smile + '%  Lip:' + S.live.lip + '%  Jaw:' + S.live.jaw + '%  Muscle:' + S.live.muscle + '%',
+        12, c.height - 22
+    );
+
+    var dataUrl = c.toDataURL('image/jpeg', 0.84);
+    S.lastShot = dataUrl;
+    S.shots.push(dataUrl);
+
+    // Add thumbnail to strip
+    var strip = document.getElementById('shotStrip');
+    var div = document.createElement('div'); div.className = 'shot-mini';
+    div.innerHTML = '<img src="' + dataUrl + '" onclick="openLB(\'' + dataUrl + '\')" title="' + new Date().toLocaleTimeString() + '">';
+    strip.appendChild(div);
+    document.getElementById('shotSection').style.display = 'block';
+    document.getElementById('shotCount').style.display = 'block';
+    document.getElementById('shotNum').textContent = S.shots.length;
+}
+
+// ─── Frame Analysis (pixel brightness heuristics) ────
+function doFrame() {
+    var vid = document.getElementById('vid'); var ov = document.getElementById('ov');
+    if (!vid.videoWidth) return;
+    ov.width = vid.videoWidth; ov.height = vid.videoHeight;
+    var ctx = ov.getContext('2d');
+    ctx.drawImage(vid, 0, 0);
+    var img = ctx.getImageData(0, 0, ov.width, ov.height);
+    ctx.clearRect(0, 0, ov.width, ov.height);
+    var W = ov.width, H = ov.height;
+
+    var mouth = sr(img,W,H, 0.28,0.55, 0.72,0.76);
+    var eye   = sr(img,W,H, 0.22,0.22, 0.78,0.45);
+    var lc    = sr(img,W,H, 0.08,0.38, 0.38,0.65);
+    var rc    = sr(img,W,H, 0.62,0.38, 0.92,0.65);
+
+    var jaw    = cl(mr(mouth.v, 4, 85, 18, 96), 0, 100);
+    var lip    = cl(mr(mouth.m*0.38 + mouth.v*0.62, 28, 95, 22, 97), 0, 100);
+    var cd     = Math.abs(lc.m - rc.m);
+    var smile  = cl(mr(cd, 0, 28, 92, 28), 0, 100);
+    var muscle = cl(mr(eye.m, 55, 165, 38, 92), 0, 100);
+    var ovall  = Math.round(smile*0.35 + lip*0.25 + jaw*0.25 + muscle*0.15);
+    var weak   = cd > 16 ? (lc.m < rc.m ? 'left' : 'right') : 'none';
+
+    S.live = { smile:Math.round(smile), lip:Math.round(lip), jaw:Math.round(jaw), muscle:Math.round(muscle), overall:ovall, weak:weak };
+    S.readings.smile.push(S.live.smile); S.readings.lip.push(S.live.lip);
+    S.readings.jaw.push(S.live.jaw);     S.readings.muscle.push(S.live.muscle);
+    S.weakCount[weak]++;
+
+    setBar('bSmile','vSmile', S.live.smile, 'var(--primary)');
+    setBar('bLip',  'vLip',   S.live.lip,   'var(--accent)');
+    setBar('bJaw',  'vJaw',   S.live.jaw,   'var(--success)');
+    setBar('bMuscle','vMuscle',S.live.muscle,'var(--warning)');
+    var br = Math.round(12 + (S.live.muscle/100)*8);
+    document.getElementById('bBlink').style.width = Math.min(br*4,100)+'%';
+    document.getElementById('vBlink').textContent = br+'/min';
+    document.getElementById('vOverall').textContent = ovall+'%';
+    document.getElementById('vReps').style.display = 'block';
+    document.getElementById('repsNum').textContent = ovall<55?15:ovall<75?12:10;
+    if (weak!='none') { document.getElementById('weakAlert').style.display='block'; document.getElementById('weakText').textContent=weak; }
+    else              { document.getElementById('weakAlert').style.display='none'; }
+
+    // Draw guide overlays
+    ctx.strokeStyle='rgba(99,102,241,0.3)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.strokeRect(W*0.28,H*0.55,W*0.44,H*0.21);
+    ctx.strokeStyle='rgba(6,182,212,0.3)';
+    ctx.strokeRect(W*0.22,H*0.22,W*0.56,H*0.23);
+    ctx.setLineDash([]);
+}
+
+// ─── Helpers ─────────────────────────────────────────
+function sr(img,W,H,x1r,y1r,x2r,y2r){
+    var x1=~~(x1r*W),x2=~~(x2r*W),y1=~~(y1r*H),y2=~~(y2r*H),s=0,n=0,vs=[];
+    for(var y=y1;y<y2;y+=4) for(var x=x1;x<x2;x+=4){
+        var i=(y*W+x)*4, b=img.data[i]*0.299+img.data[i+1]*0.587+img.data[i+2]*0.114;
+        s+=b; vs.push(b); n++;
+    }
+    var m=n?s/n:128, vs2=0; vs.forEach(function(v){vs2+=(v-m)*(v-m);});
+    return {m:m, v:n?Math.sqrt(vs2/n):0};
+}
+function cl(v,a,b){return Math.max(a,Math.min(b,v));}
+function mr(v,i0,i1,o0,o1){return o0+(o1-o0)*((v-i0)/(i1-i0));}
+function setBar(bid,vid,val,col){document.getElementById(bid).style.width=val+'%';document.getElementById(vid).textContent=val+'%';}
+function formatTime(s){return String(~~(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
+
+function openLB(src){ document.getElementById('lbImg').src=src; document.getElementById('lb').classList.add('open'); }
+function closeLB(){ document.getElementById('lb').classList.remove('open'); }
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeLB(); });
+</script>
+{% endblock %}

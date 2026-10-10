@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}Patient Dashboard{% endblock %}
+{% block content %}
+
+{% if unread_count > 0 %}
+<div class="alert alert-success" style="background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.3);color:#67e8f9;">
+    <i class="fas fa-comment-dots"></i>
+    <strong>{{ unread_count }} new feedback</strong> from your therapist.
+    <a href="{% url 'patient:reports' %}" style="color:var(--accent);font-weight:600;">View in Reports →</a>
+</div>
+{% endif %}
+
+<div class="page-header">
+    <h1 class="page-title">👋 Welcome, {{ request.user.first_name|default:request.user.username }}</h1>
+    <p class="page-subtitle">Track your speech therapy progress and facial rehabilitation</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(99,102,241,0.2);">🎯</div>
+        <div>
+            <div class="stat-value" style="color:var(--primary);">{{ avg_accuracy }}%</div>
+            <div class="stat-label">Avg Accuracy</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(16,185,129,0.2);">📅</div>
+        <div>
+            <div class="stat-value" style="color:var(--success);">{{ total_sessions }}</div>
+            <div class="stat-label">Sessions Done</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba({% if improvement >= 0 %}16,185,129{% else %}239,68,68{% endif %},0.2);">📈</div>
+        <div>
+            <div class="stat-value" style="color:var(--{% if improvement >= 0 %}success{% else %}danger{% endif %});">
+                {% if improvement >= 0 %}+{% endif %}{{ improvement }}%
+            </div>
+            <div class="stat-label">Improvement</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(245,158,11,0.2);">🏥</div>
+        <div>
+            {% if profile %}
+                {% if profile.severity == 'mild' %}
+                <div class="stat-value" style="color:var(--success);">Mild</div>
+                {% elif profile.severity == 'moderate' %}
+                <div class="stat-value" style="color:var(--warning);">Moderate</div>
+                {% else %}
+                <div class="stat-value" style="color:var(--danger);">Severe</div>
+                {% endif %}
+            {% else %}
+                <div class="stat-value" style="color:var(--text-secondary);">—</div>
+            {% endif %}
+            <div class="stat-label">Recovery Level</div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;">
+    <a href="{% url 'practice:home' %}" class="glass-card" style="text-align:center;text-decoration:none;padding:20px;transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+        <div style="font-size:32px;margin-bottom:8px;">🎤</div>
+        <div style="font-size:14px;font-weight:600;">Speech Practice</div>
+    </a>
+    <a href="{% url 'patient:facial_analysis' %}" class="glass-card" style="text-align:center;text-decoration:none;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+        <div style="font-size:32px;margin-bottom:8px;">🧠</div>
+        <div style="font-size:14px;font-weight:600;">Facial Analysis</div>
+    </a>
+    <a href="{% url 'patient:exercises' %}" class="glass-card" style="text-align:center;text-decoration:none;padding:20px;transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+        <div style="font-size:32px;margin-bottom:8px;">🏋️</div>
+        <div style="font-size:14px;font-weight:600;">My Exercises</div>
+    </a>
+    <a href="{% url 'patient:reports' %}" class="glass-card" style="text-align:center;text-decoration:none;padding:20px;transition:transform 0.2s;position:relative;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+        {% if unread_count > 0 %}
+        <div style="position:absolute;top:12px;right:12px;background:var(--danger);color:white;width:20px;height:20px;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ unread_count }}</div>
+        {% endif %}
+        <div style="font-size:32px;margin-bottom:8px;">📋</div>
+        <div style="font-size:14px;font-weight:600;">Reports & Feedback</div>
+    </a>
+</div>
+
+<div class="grid-2">
+    <!-- Chart -->
+    <div class="glass-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:18px;">📊 Recent Progress</h3>
+        <canvas id="progressChart" height="150"></canvas>
+    </div>
+
+    <!-- Latest Feedback -->
+    <div class="glass-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:18px;">💬 Latest Therapist Feedback</h3>
+        {% if unread_feedbacks %}
+            {% for fb in unread_feedbacks %}
+            <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:14px;margin-bottom:10px;border-left:3px solid var(--primary);">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                    <span style="font-size:12px;color:var(--text-secondary);">Dr. {{ fb.therapist.get_full_name }} · {{ fb.created_at|date:"M d" }}</span>
+                    <span style="font-size:12px;">{% for i in "12345" %}{% if forloop.counter <= fb.rating %}⭐{% endif %}{% endfor %}</span>
+                </div>
+                <p style="font-size:14px;margin:0;">{{ fb.feedback_text|truncatechars:100 }}</p>
+            </div>
+            {% endfor %}
+            <a href="{% url 'patient:reports' %}" class="btn btn-glass btn-sm" style="width:100%;justify-content:center;margin-top:4px;">View All →</a>
+        {% else %}
+            <div style="text-align:center;padding:32px 0;color:var(--text-secondary);">
+                <div style="font-size:36px;margin-bottom:8px;opacity:0.3;">💬</div>
+                <p style="font-size:13px;">No new feedback from therapist.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recent Sessions -->
+{% if recent_sessions %}
+<div class="glass-card" style="margin-top:24px;">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">🕒 Recent Sessions</h3>
+    <table class="data-table">
+        <thead><tr><th>Date</th><th>Score</th><th>Text Accuracy</th><th>Duration</th></tr></thead>
+        <tbody>
+            {% for s in recent_sessions %}
+            <tr>
+                <td>{{ s.created_at|date:"M d, Y H:i" }}</td>
+                <td>
+                    {% if s.final_score >= 70 %}
+                    <span style="color:var(--success);font-weight:700;">{{ s.final_score|floatformat:1 }}%</span>
+                    {% elif s.final_score >= 40 %}
+                    <span style="color:var(--warning);font-weight:700;">{{ s.final_score|floatformat:1 }}%</span>
+                    {% else %}
+                    <span style="color:var(--danger);font-weight:700;">{{ s.final_score|floatformat:1 }}%</span>
+                    {% endif %}
+                </td>
+                <td style="color:var(--text-secondary);">{{ s.text_accuracy|floatformat:1 }}%</td>
+                <td style="color:var(--text-secondary);">{{ s.duration_seconds|floatformat:0 }}s</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById('progressChart'), {
+  type: 'line',
+  data: {
+    labels: {{ chart_labels|safe }},
+    datasets: [{
+      label: 'Score %', data: {{ chart_data|safe }},
+      borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)',
+      tension: 0.4, fill: true, pointBackgroundColor: '#6366f1', pointRadius: 4
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+    }
+  }
+});
+</script>
+{% endblock %}

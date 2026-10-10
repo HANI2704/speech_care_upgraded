@@ -1,0 +1,578 @@
+{% extends 'base.html' %}
+{% block title %}Practice Session{% endblock %}
+{% block nav_practice %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.practice-wrap { max-width: 1100px; margin: 0 auto; }
+
+.text-display {
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 20px; padding: 28px 32px;
+    font-size: 22px; line-height: 1.9; font-weight: 500;
+    margin-bottom: 20px; position: relative; letter-spacing: 0.3px;
+}
+.text-display .cat-badge {
+    position:absolute; top:14px; right:16px;
+    background:rgba(99,102,241,0.3); border:1px solid rgba(99,102,241,0.5);
+    color:#a5b4fc; font-size:11px; font-weight:700;
+    padding:4px 12px; border-radius:99px; text-transform:uppercase;
+}
+
+/* Two-column layout */
+.practice-cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+@media(max-width:768px){ .practice-cols { grid-template-columns:1fr; } }
+
+.panel {
+    background:var(--glass); backdrop-filter:blur(20px);
+    border:1px solid var(--glass-border); border-radius:20px; padding:22px;
+}
+
+/* Camera */
+.cam-wrap {
+    position:relative; background:#080614; border-radius:14px;
+    overflow:hidden; aspect-ratio:4/3; margin-bottom:14px;
+}
+#videoEl { width:100%; height:100%; object-fit:cover; display:block; }
+#camCanvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+.cam-badge {
+    position:absolute; top:10px; right:10px;
+    background:rgba(0,0,0,0.65); color:#94a3b8;
+    padding:5px 12px; border-radius:20px; font-size:11px; font-weight:600;
+    border:1px solid rgba(255,255,255,0.12);
+}
+.cam-placeholder {
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; background:rgba(8,6,20,0.9);
+}
+
+/* Mic button */
+.mic-btn {
+    width:80px; height:80px; border-radius:50%;
+    background:linear-gradient(135deg,var(--primary),var(--secondary));
+    border:none; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:30px; color:white;
+    box-shadow:0 6px 30px rgba(99,102,241,0.5);
+    transition:all 0.3s; margin-bottom:12px;
+}
+.mic-btn.recording {
+    background:linear-gradient(135deg,#ef4444,#dc2626);
+    box-shadow:0 6px 30px rgba(239,68,68,0.5);
+    animation:pulse-r 1.5s ease infinite;
+}
+@keyframes pulse-r {
+    0%,100%{transform:scale(1); box-shadow:0 6px 30px rgba(239,68,68,0.5);}
+    50%{transform:scale(1.06); box-shadow:0 10px 50px rgba(239,68,68,0.7);}
+}
+.rec-dot { display:inline-block; width:8px; height:8px; background:#ef4444; border-radius:50%; animation:blink 1s infinite; margin-right:5px; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0;} }
+
+/* Waveform */
+.waveform { height:50px; background:rgba(255,255,255,0.04); border-radius:10px; margin-bottom:14px; overflow:hidden; }
+canvas#waveCanvas { width:100%; height:50px; }
+
+/* Facial meter bars */
+.fbar-wrap { margin-bottom:10px; }
+.fbar-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+.fbar { height:7px; background:rgba(255,255,255,0.08); border-radius:99px; overflow:hidden; }
+.fbar-fill { height:100%; border-radius:99px; transition:width 0.35s ease; }
+
+/* Analyze btn */
+.analyze-btn {
+    width:100%; padding:16px; border-radius:14px;
+    background:linear-gradient(135deg,#10b981,#059669);
+    color:white; font-size:15px; font-weight:700;
+    border:none; cursor:pointer;
+    box-shadow:0 6px 25px rgba(16,185,129,0.4);
+    transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:10px;
+}
+.analyze-btn:hover { transform:translateY(-2px); }
+.analyze-btn:disabled { opacity:0.55; cursor:not-allowed; transform:none; }
+
+/* Loading overlay */
+.loading-overlay {
+    display:none; position:fixed; inset:0; z-index:9000;
+    background:rgba(10,8,20,0.88); backdrop-filter:blur(10px);
+    align-items:center; justify-content:center; flex-direction:column; gap:14px;
+}
+.loading-overlay.show { display:flex; }
+.spinner { width:54px; height:54px; border:3px solid rgba(99,102,241,0.25); border-top-color:var(--primary); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+textarea.spoken-area {
+    width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14);
+    border-radius:12px; padding:12px; color:white; font-size:14px;
+    min-height:72px; resize:vertical; outline:none; margin-bottom:14px; font-family:inherit;
+}
+textarea.spoken-area:focus { border-color:var(--primary); }
+textarea.spoken-area::placeholder { color:rgba(255,255,255,0.28); }
+
+.score-pill {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 14px; border-radius:20px; font-size:13px; font-weight:700;
+    background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#a5b4fc;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="practice-wrap">
+
+    <div class="page-header" style="display:flex;align-items:center;gap:16px;">
+        <a href="{% url 'practice:home' %}" class="btn btn-glass btn-sm"><i class="fas fa-arrow-left"></i></a>
+        <div>
+            <div class="page-title">🎙️ {{ practice_text.title }}</div>
+            <div class="page-subtitle">{{ practice_text.get_category_display }} · {{ practice_text.get_difficulty_display }} · Speech + Facial Analysis</div>
+        </div>
+    </div>
+
+    <!-- Text to read -->
+    <div class="text-display">
+        <span class="cat-badge">{{ practice_text.get_difficulty_display }}</span>
+        <div id="displayText">{{ practice_text.content }}</div>
+    </div>
+
+    <!-- Instructions -->
+    <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:14px;padding:14px 18px;margin-bottom:20px;">
+        <ul style="list-style:none;margin:0;padding:0;">
+            <li style="font-size:13px;color:rgba(255,255,255,0.75);padding:3px 0 3px 20px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--primary);">→</span>Click <strong>Start Session</strong> to activate microphone + camera simultaneously</li>
+            <li style="font-size:13px;color:rgba(255,255,255,0.75);padding:3px 0 3px 20px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--primary);">→</span>Read the text above clearly while facing the camera</li>
+            <li style="font-size:13px;color:rgba(255,255,255,0.75);padding:3px 0 3px 20px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--primary);">→</span>Facial metrics (smile, lip, jaw) update live on the right panel</li>
+            <li style="font-size:13px;color:rgba(255,255,255,0.75);padding:3px 0 3px 20px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--primary);">→</span>Click <strong>Analyze</strong> to save both your speech score and facial score together</li>
+        </ul>
+    </div>
+
+    <div class="practice-cols">
+
+        <!-- ─── LEFT: Microphone Panel ─── -->
+        <div class="panel" style="text-align:center;">
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary);margin-bottom:16px;">🎤 Speech Recording</div>
+
+            <button class="mic-btn" id="micBtn" onclick="toggleRecording()">
+                <i class="fas fa-microphone" id="micIcon"></i>
+            </button>
+            <div style="font-size:26px;font-weight:800;color:var(--primary);margin-bottom:8px;display:none;" id="timer">00:00</div>
+            <div style="font-size:14px;color:rgba(255,255,255,0.65);margin-bottom:14px;" id="statusText">Click to start recording</div>
+            <div id="recIndicator" style="display:none;margin-bottom:10px;">
+                <span style="font-size:12px;color:#fca5a5;"><span class="rec-dot"></span>RECORDING</span>
+            </div>
+
+            <div class="waveform"><canvas id="waveCanvas"></canvas></div>
+
+            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);display:block;text-align:left;margin-bottom:6px;">Spoken Text (auto-filled or type manually):</label>
+            <textarea class="spoken-area" id="spokenText" placeholder="Your speech appears here automatically, or type it..."></textarea>
+
+            <button class="analyze-btn" id="analyzeBtn" onclick="analyzeNow()" disabled>
+                <i class="fas fa-brain"></i> Analyze Speech + Face
+            </button>
+        </div>
+
+        <!-- ─── RIGHT: Camera + Facial Metrics ─── -->
+        <div class="panel">
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary);margin-bottom:14px;">📷 Facial Analysis (Live)</div>
+
+            <div class="cam-wrap">
+                <video id="videoEl" autoplay muted playsinline></video>
+                <canvas id="camCanvas"></canvas>
+                <div class="cam-badge" id="camBadge">⬛ Camera Off</div>
+                <div class="cam-placeholder" id="camPlaceholder">
+                    <div style="font-size:36px;margin-bottom:8px;">📷</div>
+                    <p style="font-size:13px;color:var(--text-secondary);">Camera starts with recording</p>
+                </div>
+            </div>
+
+            <!-- Live metrics -->
+            <div id="facialMetrics">
+                <div class="fbar-wrap">
+                    <div class="fbar-label"><span>😊 Smile Symmetry</span><span id="fSmileVal" style="color:var(--primary);font-weight:700;">—</span></div>
+                    <div class="fbar"><div class="fbar-fill" id="fSmileBar" style="width:0%;background:linear-gradient(90deg,var(--primary),var(--secondary));"></div></div>
+                </div>
+                <div class="fbar-wrap">
+                    <div class="fbar-label"><span>👄 Lip Movement</span><span id="fLipVal" style="color:var(--accent);font-weight:700;">—</span></div>
+                    <div class="fbar"><div class="fbar-fill" id="fLipBar" style="width:0%;background:linear-gradient(90deg,var(--accent),#0891b2);"></div></div>
+                </div>
+                <div class="fbar-wrap">
+                    <div class="fbar-label"><span>🦷 Jaw Opening</span><span id="fJawVal" style="color:var(--success);font-weight:700;">—</span></div>
+                    <div class="fbar"><div class="fbar-fill" id="fJawBar" style="width:0%;background:linear-gradient(90deg,var(--success),#059669);"></div></div>
+                </div>
+                <div class="fbar-wrap">
+                    <div class="fbar-label"><span>💪 Muscle Strength</span><span id="fMuscleVal" style="color:var(--warning);font-weight:700;">—</span></div>
+                    <div class="fbar"><div class="fbar-fill" id="fMuscleBar" style="width:0%;background:linear-gradient(90deg,var(--warning),#d97706);"></div></div>
+                </div>
+
+                <div id="weakAlert" style="display:none;margin-top:10px;padding:8px 12px;border-radius:10px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);font-size:12px;color:#fcd34d;">
+                    ⚠️ Weak side: <strong id="weakText"></strong>
+                </div>
+
+                <div style="margin-top:14px;padding:14px;background:rgba(99,102,241,0.1);border-radius:12px;border:1px solid rgba(99,102,241,0.2);text-align:center;">
+                    <div id="fOverall" style="font-size:36px;font-weight:900;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">—</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Facial Score</div>
+                    <div id="fReps" style="display:none;margin-top:6px;font-size:12px;color:var(--accent);">💡 Suggested: <strong id="fRepsNum"></strong> reps</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div style="font-size:16px;font-weight:600;">Analyzing speech + facial data...</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.55);">Calculating accuracy, volume, stability, facial scores</div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────
+let mediaRecorder = null, audioChunks = [], audioBlob = null;
+let isRecording = false, timerInterval = null, seconds = 0;
+let recognition = null, audioContext = null, analyserNode = null, animFrame = null;
+let camStream = null, camInterval = null;
+let practiceScreenshot = null;  // stored screenshot for saving with session
+
+// Accumulated facial measurements during session
+let facialReadings = { smile:[], lip:[], jaw:[], muscle:[] };
+let weakSideAccum = { left:0, right:0, none:0 };
+
+// ─── Capture practice screenshot ─────────────────────
+function capturePracticeScreenshot() {
+    var vid = document.getElementById('videoEl');
+    if (!vid || !vid.videoWidth) return;
+    var c = document.createElement('canvas');
+    c.width = vid.videoWidth; c.height = vid.videoHeight;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(vid, 0, 0);
+    // Stamp overlay
+    var facAvg = getFacialAverages();
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, c.height - 60, c.width, 60);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Segoe UI';
+    ctx.fillText('Practice Session | ' + new Date().toLocaleTimeString(), 12, c.height - 40);
+    ctx.fillStyle = '#a5b4fc'; ctx.font = '12px Segoe UI';
+    ctx.fillText('Smile:' + facAvg.smile_symmetry + '%  Jaw:' + facAvg.jaw_opening + '%  Facial Score:' + facAvg.overall_score + '%', 12, c.height - 18);
+    practiceScreenshot = c.toDataURL('image/jpeg', 0.82);
+}
+
+// ─── Camera setup ────────────────────────────────────
+async function startCamera() {
+    try {
+        camStream = await navigator.mediaDevices.getUserMedia({ video: { width:640, height:480, facingMode:'user' } });
+        const vid = document.getElementById('videoEl');
+        vid.srcObject = camStream;
+        document.getElementById('camPlaceholder').style.display = 'none';
+        document.getElementById('camBadge').textContent = '🟢 Live';
+        document.getElementById('camBadge').style.color = '#6ee7b7';
+        camInterval = setInterval(analyseFrame, 300);
+    } catch(e) {
+        document.getElementById('camBadge').textContent = '❌ No Camera';
+    }
+}
+
+function stopCamera() {
+    clearInterval(camInterval);
+    if (camStream) camStream.getTracks().forEach(t => t.stop());
+    document.getElementById('camBadge').textContent = '⬛ Off';
+    document.getElementById('camBadge').style.color = '#94a3b8';
+    document.getElementById('camPlaceholder').style.display = 'flex';
+}
+
+// ─── Deterministic facial analysis from video frame ──
+function analyseFrame() {
+    const vid = document.getElementById('videoEl');
+    const canvas = document.getElementById('camCanvas');
+    if (!vid.videoWidth) return;
+
+    canvas.width  = vid.videoWidth;
+    canvas.height = vid.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(vid, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // ── Real pixel-based heuristics ──
+    const W = canvas.width, H = canvas.height;
+    // Sample the lower-middle face region (mouth/jaw zone ~ 55-75% height, 30-70% width)
+    const mouthZone = sampleRegion(imgData, W, H, 0.30, 0.55, 0.70, 0.75);
+    // Upper-middle face region (eyes ~25-45% height)
+    const eyeZone   = sampleRegion(imgData, W, H, 0.25, 0.25, 0.75, 0.45);
+    // Left cheek vs right cheek brightness
+    const leftCheek  = sampleRegion(imgData, W, H, 0.10, 0.40, 0.38, 0.65);
+    const rightCheek = sampleRegion(imgData, W, H, 0.62, 0.40, 0.90, 0.65);
+
+    // Brightness-based proxies (skin motion = brightness variance)
+    const mouthBright  = mouthZone.mean;
+    const mouthVariance= mouthZone.variance;
+    const eyeBright    = eyeZone.mean;
+    const cheekDiff    = Math.abs(leftCheek.mean - rightCheek.mean);
+
+    // ── Score mapping ──────────────────────────────────
+    // Jaw opening: high mouth region variance → mouth is open
+    const jaw = clamp(mapRange(mouthVariance, 5, 80, 20, 95), 0, 100);
+
+    // Lip movement: combination of mouth brightness change and variance
+    const lip = clamp(mapRange(mouthBright * 0.4 + mouthVariance * 0.6, 30, 90, 25, 95), 0, 100);
+
+    // Smile symmetry: low left/right cheek difference → symmetric
+    const smile = clamp(mapRange(cheekDiff, 0, 30, 90, 30), 0, 100);
+
+    // Muscle strength: eye zone brightness variance (raised eyebrows / eye openness)
+    const muscle = clamp(mapRange(eyeBright, 60, 160, 40, 90), 0, 100);
+
+    const overall = Math.round((smile * 0.35 + lip * 0.25 + jaw * 0.25 + muscle * 0.15));
+    const weakSide = cheekDiff > 18 ? (leftCheek.mean < rightCheek.mean ? 'left' : 'right') : 'none';
+
+    // Accumulate
+    facialReadings.smile.push(smile);
+    facialReadings.lip.push(lip);
+    facialReadings.jaw.push(jaw);
+    facialReadings.muscle.push(muscle);
+    weakSideAccum[weakSide]++;
+
+    // Update UI bars
+    setFBar('fSmile', smile, 'var(--primary)');
+    setFBar('fLip',   lip,   'var(--accent)');
+    setFBar('fJaw',   jaw,   'var(--success)');
+    setFBar('fMuscle',muscle,'var(--warning)');
+    document.getElementById('fOverall').textContent = overall + '%';
+
+    const reps = overall < 55 ? 15 : overall < 75 ? 12 : 10;
+    document.getElementById('fReps').style.display = 'block';
+    document.getElementById('fRepsNum').textContent = reps;
+
+    if (weakSide !== 'none') {
+        document.getElementById('weakAlert').style.display = 'block';
+        document.getElementById('weakText').textContent = weakSide;
+    } else {
+        document.getElementById('weakAlert').style.display = 'none';
+    }
+}
+
+function sampleRegion(imgData, W, H, x1r, y1r, x2r, y2r) {
+    const x1 = Math.floor(x1r * W), x2 = Math.floor(x2r * W);
+    const y1 = Math.floor(y1r * H), y2 = Math.floor(y2r * H);
+    let sum = 0, count = 0, vals = [];
+    for (let y = y1; y < y2; y += 4) {
+        for (let x = x1; x < x2; x += 4) {
+            const i = (y * W + x) * 4;
+            const bright = (imgData.data[i] * 0.299 + imgData.data[i+1] * 0.587 + imgData.data[i+2] * 0.114);
+            sum += bright; vals.push(bright); count++;
+        }
+    }
+    const mean = count > 0 ? sum / count : 128;
+    let vSum = 0;
+    vals.forEach(v => vSum += (v - mean) ** 2);
+    return { mean, variance: count > 0 ? Math.sqrt(vSum / count) : 0 };
+}
+
+function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+function mapRange(v, inMin, inMax, outMin, outMax) {
+    return outMin + (outMax - outMin) * ((v - inMin) / (inMax - inMin));
+}
+
+function setFBar(id, val, color) {
+    const rounded = Math.round(val);
+    document.getElementById(id + 'Val').textContent = rounded + '%';
+    const bar = document.getElementById(id + 'Bar');
+    bar.style.width = rounded + '%';
+}
+
+// ─── Average accumulated facial readings ─────────────
+function getFacialAverages() {
+    const avg = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
+    const dominantWeak = Object.entries(weakSideAccum).sort((a,b)=>b[1]-a[1])[0][0];
+    return {
+        smile_symmetry: avg(facialReadings.smile),
+        lip_movement:   avg(facialReadings.lip),
+        jaw_opening:    avg(facialReadings.jaw),
+        muscle_strength:avg(facialReadings.muscle),
+        overall_score:  Math.round((avg(facialReadings.smile)*0.35 + avg(facialReadings.lip)*0.25 + avg(facialReadings.jaw)*0.25 + avg(facialReadings.muscle)*0.15)),
+        weak_side:      dominantWeak,
+        eye_blink_rate: 15,
+        suggested_reps: avg(facialReadings.smile) < 60 ? 15 : 10,
+        improvement_from_last: 0,
+        duration_seconds: seconds,
+    };
+}
+
+// ─── Microphone ──────────────────────────────────────
+let _finalTranscript = '';
+
+function setupSpeechRecognition() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return null;
+    const r = new SR();
+    r.continuous = true; r.interimResults = true; r.lang = 'en-US';
+    r.onresult = e => {
+        let interimTranscript = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) {
+                _finalTranscript += e.results[i][0].transcript + ' ';
+            } else {
+                interimTranscript += e.results[i][0].transcript;
+            }
+        }
+        // Show final + interim so user sees live feedback without duplication
+        document.getElementById('spokenText').value = (_finalTranscript + interimTranscript).trim();
+    };
+    return r;
+}
+
+async function toggleRecording() {
+    if (isRecording) stopRecording();
+    else await startRecording();
+}
+
+async function startRecording() {
+    try {
+        // Reset facial accumulator
+        facialReadings = { smile:[], lip:[], jaw:[], muscle:[] };
+        weakSideAccum = { left:0, right:0, none:0 };
+
+        const micStream = await navigator.mediaDevices.getUserMedia({
+            audio: { sampleRate:16000, channelCount:1, autoGainControl:false, echoCancellation:true, noiseSuppression:false }
+        });
+
+        // Start camera at same time
+        await startCamera();
+
+        audioContext = new AudioContext({ sampleRate:16000 });
+        const src = audioContext.createMediaStreamSource(micStream);
+        analyserNode = audioContext.createAnalyser(); analyserNode.fftSize = 256;
+        src.connect(analyserNode); drawWaveform();
+
+        mediaRecorder = new MediaRecorder(micStream, { mimeType:'audio/webm' });
+        audioChunks = [];
+        mediaRecorder.ondataavailable = e => { if(e.data.size>0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            audioBlob = new Blob(audioChunks, { type:'audio/webm' });
+            document.getElementById('analyzeBtn').disabled = false;
+            micStream.getTracks().forEach(t => t.stop());
+        };
+        mediaRecorder.start(100);
+
+        recognition = setupSpeechRecognition();
+        if (recognition) recognition.start();
+
+        isRecording = true;
+        document.getElementById('micBtn').classList.add('recording');
+        document.getElementById('micIcon').className = 'fas fa-stop';
+        document.getElementById('statusText').textContent = 'Recording… Read the text above clearly';
+        document.getElementById('recIndicator').style.display = 'block';
+        document.getElementById('timer').style.display = 'block';
+        _finalTranscript = '';  // reset transcript on new recording
+        document.getElementById('spokenText').value = '';
+
+        seconds = 0;
+        timerInterval = setInterval(() => {
+            seconds++;
+            const m = String(Math.floor(seconds/60)).padStart(2,'0');
+            const s = String(seconds%60).padStart(2,'0');
+            document.getElementById('timer').textContent = `${m}:${s}`;
+        }, 1000);
+
+    } catch(err) {
+        alert('Microphone access denied. Please allow microphone access.\\n\\nYou can still type your speech manually below.');
+        document.getElementById('analyzeBtn').disabled = false;
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if (recognition) { try { recognition.stop(); } catch(e){} }
+    clearInterval(timerInterval);
+    if (animFrame) cancelAnimationFrame(animFrame);
+
+    // Capture final screenshot before stopping camera
+    capturePracticeScreenshot();
+
+    stopCamera();
+
+    isRecording = false;
+    document.getElementById('micBtn').classList.remove('recording');
+    document.getElementById('micIcon').className = 'fas fa-microphone';
+    document.getElementById('statusText').textContent = 'Stopped. Click Analyze to get your full score.';
+    document.getElementById('recIndicator').style.display = 'none';
+
+    const canvas = document.getElementById('waveCanvas');
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawWaveform() {
+    const canvas = document.getElementById('waveCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    const draw = () => {
+        animFrame = requestAnimationFrame(draw);
+        const buf = new Uint8Array(analyserNode.frequencyBinCount);
+        analyserNode.getByteTimeDomainData(buf);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 2; ctx.strokeStyle = '#6366f1';
+        ctx.beginPath();
+        const sw = canvas.width / buf.length;
+        buf.forEach((v, i) => {
+            const y = (v / 128) * canvas.height / 2;
+            i === 0 ? ctx.moveTo(0, y) : ctx.lineTo(i * sw, y);
+        });
+        ctx.lineTo(canvas.width, canvas.height / 2); ctx.stroke();
+    };
+    draw();
+}
+
+// ─── Analyze & Save ──────────────────────────────────
+async function analyzeNow() {
+    const spokenText = document.getElementById('spokenText').value.trim();
+    if (!spokenText && !audioBlob) {
+        alert('Please record or type your spoken text first.'); return;
+    }
+    document.getElementById('loadingOverlay').classList.add('show');
+    document.getElementById('analyzeBtn').disabled = true;
+
+    try {
+        let audioBase64 = '';
+        if (audioBlob) {
+            const ab = await audioBlob.arrayBuffer();
+            const u8 = new Uint8Array(ab);
+            let bin = '';
+            u8.forEach(b => bin += String.fromCharCode(b));
+            audioBase64 = btoa(bin);
+        }
+
+        const facialData = getFacialAverages();
+
+        const resp = await fetch('{% url "practice:analyze" %}', {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json', 'X-CSRFToken':'{{ csrf_token }}' },
+            body: JSON.stringify({
+                text_id: {{ practice_text.id }},
+                spoken_text: spokenText,
+                audio_data: audioBase64,
+                sample_rate: 16000,
+                facial_data: facialData,   // NEW: send facial scores with speech
+                practice_screenshot: practiceScreenshot || '',  // screenshot from camera
+            })
+        });
+
+        const data = await resp.json();
+        if (data.success) {
+            window.location.href = `/practice/result/${data.session_id}/`;
+        } else {
+            alert('Error: ' + (data.error || 'Analysis failed'));
+            document.getElementById('analyzeBtn').disabled = false;
+        }
+    } catch(err) {
+        alert('Network error: ' + err.message);
+        document.getElementById('analyzeBtn').disabled = false;
+    } finally {
+        document.getElementById('loadingOverlay').classList.remove('show');
+    }
+}
+
+document.getElementById('spokenText').addEventListener('input', function() {
+    if (this.value.trim()) document.getElementById('analyzeBtn').disabled = false;
+});
+</script>
+{% endblock %}

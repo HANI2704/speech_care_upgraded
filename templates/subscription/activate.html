@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Choose Plan{% endblock %}
+{% block content %}
+
+<div class="page-header" style="text-align:center;">
+    <h1 class="page-title">👑 Choose Your Plan</h1>
+    <p class="page-subtitle">Unlock full access to SpeechCare's professional therapy platform</p>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-success" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;justify-content:center;">✅ {{ msg }}</div>
+{% endfor %}
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:700px;margin:0 auto;">
+    <!-- Basic Plan -->
+    <div class="glass-card" style="text-align:center;padding:36px 28px;">
+        <div style="font-size:42px;margin-bottom:12px;">🥈</div>
+        <h3 style="font-size:20px;font-weight:800;margin-bottom:4px;">Basic</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px;">1 Month Access</p>
+        <div style="font-size:40px;font-weight:900;color:var(--primary);margin-bottom:20px;">₹999</div>
+        <div style="text-align:left;margin-bottom:24px;">
+            {% for feat in basic_features %}
+            <div style="padding:8px 0;border-bottom:1px solid var(--glass-border);font-size:14px;">✅ {{ feat }}</div>
+            {% endfor %}
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="plan" value="Basic">
+            <input type="hidden" name="duration_days" value="30">
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Activate Basic</button>
+        </form>
+    </div>
+
+    <!-- Pro Plan -->
+    <div class="glass-card" style="text-align:center;padding:36px 28px;border-color:rgba(245,158,11,0.4);position:relative;overflow:hidden;">
+        <div style="position:absolute;top:14px;right:14px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);color:#fcd34d;">POPULAR</div>
+        <div style="font-size:42px;margin-bottom:12px;">🥇</div>
+        <h3 style="font-size:20px;font-weight:800;margin-bottom:4px;">Pro</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px;">3 Months Access</p>
+        <div style="font-size:40px;font-weight:900;color:var(--warning);margin-bottom:20px;">₹2499</div>
+        <div style="text-align:left;margin-bottom:24px;">
+            {% for feat in pro_features %}
+            <div style="padding:8px 0;border-bottom:1px solid var(--glass-border);font-size:14px;">✅ {{ feat }}</div>
+            {% endfor %}
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="plan" value="Pro">
+            <input type="hidden" name="duration_days" value="90">
+            <button type="submit" class="btn" style="width:100%;justify-content:center;background:linear-gradient(135deg,var(--warning),#d97706);color:white;box-shadow:0 4px 20px rgba(245,158,11,0.4);">Activate Pro</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

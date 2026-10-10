@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Profile{% endblock %}
+{% block nav_profile %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">👤 My Profile</div>
+    <div class="page-subtitle">Manage your personal information</div>
+</div>
+
+<div class="grid-2">
+    <!-- Profile Card -->
+    <div class="glass-card" style="text-align:center;padding:40px;">
+        <div style="width:90px;height:90px;border-radius:24px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;margin:0 auto 16px;overflow:hidden;">
+            {% if user.profile_picture %}
+            <img src="{{ user.profile_picture.url }}" 
+     style="width:100%; height:100%; object-fit:cover;">
+            {% else %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% endif %}
+        </div>
+        <div style="font-size:22px;font-weight:800;">{{ user.get_full_name|default:user.username }}</div>
+        <div style="color:rgba(255,255,255,0.5);margin-top:4px;font-size:14px;">{{ user.email }}</div>
+        <div style="margin-top:12px;display:inline-flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+            <span style="padding:4px 14px;border-radius:99px;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;font-size:12px;font-weight:600;">Patient</span>
+            {% if profile.diagnosis %}
+            <span style="padding:4px 14px;border-radius:99px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fcd34d;font-size:12px;font-weight:600;">{{ profile.diagnosis }}</span>
+            {% endif %}
+            {% if profile.severity %}
+            <span style="padding:4px 14px;border-radius:99px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;font-size:12px;font-weight:600;">{{ profile.get_severity_display }}</span>
+            {% endif %}
+        </div>
+        <div style="margin-top:20px;font-size:13px;color:rgba(255,255,255,0.4);">Member since {{ user.created_at|date:"F Y" }}</div>
+    </div>
+
+    <!-- Edit Form -->
+    <div class="glass-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:20px;">✏️ Edit Information</h3>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="grid-2" style="gap:12px;">
+                <div class="form-group">
+                    <label class="form-label">First Name</label>
+                    <input type="text" name="first_name" class="form-input" value="{{ user.first_name }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Last Name</label>
+                    <input type="text" name="last_name" class="form-input" value="{{ user.last_name }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-input" value="{{ user.email }}">
+            </div>
+            <div class="grid-2" style="gap:12px;">
+                <div class="form-group">
+                    <label class="form-label">Phone</label>
+                    <input type="text" name="phone" class="form-input" value="{{ user.phone }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Age</label>
+                    <input type="number" name="age" class="form-input" value="{{ user.age }}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Gender</label>
+                <select name="gender" class="form-input">
+                    <option value="">Select</option>
+                    <option value="male" {% if user.gender == 'male' %}selected{% endif %}>Male</option>
+                    <option value="female" {% if user.gender == 'female' %}selected{% endif %}>Female</option>
+                    <option value="other" {% if user.gender == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Diagnosis</label>
+                <input type="text" name="diagnosis" class="form-input" value="{{ profile.diagnosis }}" placeholder="e.g., Stroke, Parkinson's">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Severity</label>
+                <select name="severity" class="form-input">
+                    <option value="">Select</option>
+                    <option value="mild" {% if profile.severity == 'mild' %}selected{% endif %}>Mild</option>
+                    <option value="moderate" {% if profile.severity == 'moderate' %}selected{% endif %}>Moderate</option>
+                    <option value="severe" {% if profile.severity == 'severe' %}selected{% endif %}>Severe</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Emergency Contact</label>
+                <input type="text" name="emergency_contact" class="form-input" value="{{ profile.emergency_contact }}" placeholder="Name">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Emergency Phone</label>
+                <input type="text" name="emergency_phone" class="form-input" value="{{ profile.emergency_phone }}" placeholder="+91 XXXXX XXXXX">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Profile Picture</label>
+                <input type="file" name="profile_picture" class="form-input" accept="image/*">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;">
+                <i class="fas fa-save"></i> Save Changes
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

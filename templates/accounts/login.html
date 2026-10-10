@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}Login{% endblock %}
+
+{% block auth_content %}
+<style>
+    .auth-bg {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        position: relative;
+        overflow: hidden;
+        padding: 20px;
+    }
+    .auth-bg::before, .auth-bg::after {
+        content: '';
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.2;
+    }
+    .auth-bg::before { width: 500px; height: 500px; background: #6366f1; top: -200px; left: -200px; }
+    .auth-bg::after { width: 400px; height: 400px; background: #8b5cf6; bottom: -100px; right: -100px; }
+
+    .auth-card {
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(30px);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 28px;
+        padding: 48px 40px;
+        width: 100%; max-width: 420px;
+        position: relative; z-index: 1;
+        box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+    }
+    .auth-logo {
+        text-align: center; margin-bottom: 32px;
+    }
+    .auth-logo-icon {
+        width: 70px; height: 70px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border-radius: 20px;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 32px; margin-bottom: 16px;
+        box-shadow: 0 8px 30px rgba(99,102,241,0.4);
+    }
+    .auth-title { font-size: 26px; font-weight: 800; color: #f8fafc; }
+    .auth-subtitle { color: rgba(248,250,252,0.6); font-size: 14px; margin-top: 4px; }
+
+    .role-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 28px; }
+    .role-tab {
+        padding: 10px; border-radius: 12px;
+        background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+        color: rgba(248,250,252,0.6); cursor: pointer; text-align: center;
+        font-size: 13px; font-weight: 600; text-decoration: none;
+        transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .role-tab:hover { background: rgba(99,102,241,0.2); color: #f8fafc; }
+
+    .auth-input-group { margin-bottom: 16px; }
+    .auth-input-group label { display: block; font-size: 13px; font-weight: 600; color: rgba(248,250,252,0.8); margin-bottom: 8px; }
+    .auth-input {
+        width: 100%; padding: 14px 16px; border-radius: 14px;
+        background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+        color: #f8fafc; font-size: 15px; outline: none;
+        transition: border-color 0.2s, background 0.2s;
+    }
+    .auth-input:focus { border-color: #6366f1; background: rgba(255,255,255,0.12); }
+    .auth-input::placeholder { color: rgba(255,255,255,0.3); }
+
+    .auth-btn {
+        width: 100%; padding: 16px; border-radius: 14px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white; font-size: 15px; font-weight: 700;
+        border: none; cursor: pointer;
+        box-shadow: 0 8px 30px rgba(99,102,241,0.4);
+        transition: all 0.2s; margin-top: 8px;
+    }
+    .auth-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(99,102,241,0.5); }
+
+    .auth-links { text-align: center; margin-top: 24px; font-size: 14px; color: rgba(248,250,252,0.6); }
+    .auth-links a { color: #818cf8; text-decoration: none; font-weight: 600; }
+    .auth-links a:hover { color: #a5b4fc; }
+    .divider { margin: 20px 0; text-align: center; position: relative; }
+    .divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.1); }
+    .divider span { background: transparent; padding: 0 12px; font-size: 12px; color: rgba(248,250,252,0.4); position: relative; }
+</style>
+
+<div class="auth-bg">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="auth-logo-icon">🎙️</div>
+            <div class="auth-title">SpeechCare</div>
+            <div class="auth-subtitle">Speech Therapy Platform</div>
+        </div>
+
+        {% if messages %}
+        {% for msg in messages %}
+        <div style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:14px;">
+            {{ msg }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="auth-input-group">
+                <label>Username</label>
+                <input type="text" name="username" class="auth-input" placeholder="Enter your username" required>
+            </div>
+            <div class="auth-input-group">
+                <label>Password</label>
+                <input type="password" name="password" class="auth-input" placeholder="Enter your password" required>
+            </div>
+            <button type="submit" class="auth-btn">Sign In <i class="fas fa-arrow-right"></i></button>
+        </form>
+
+        <div class="divider"><span>New to SpeechCare?</span></div>
+
+        <div class="role-tabs">
+            <a href="{% url 'accounts:register_patient' %}" class="role-tab">
+                <i class="fas fa-user"></i> Patient Register
+            </a>
+            <a href="{% url 'accounts:register_therapist' %}" class="role-tab">
+                <i class="fas fa-user-md"></i> Therapist Register
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

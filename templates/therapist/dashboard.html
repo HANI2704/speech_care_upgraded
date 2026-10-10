@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block title %}Therapist Dashboard{% endblock %}
+{% block content %}
+
+<!-- Subscription Banner -->
+{% if subscription %}
+<div style="padding:12px 18px;border-radius:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;
+    {% if subscription.days_remaining <= 5 %}background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;
+    {% elif subscription.days_remaining <= 10 %}background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fcd34d;
+    {% else %}background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.25);color:#67e8f9;{% endif %}">
+    <div style="font-size:14px;">
+        👑
+        {% if subscription.status == 'trial' %}
+        Free Trial — <strong>{{ subscription.days_remaining }} days remaining</strong>
+        {% elif subscription.status == 'active' %}
+        {{ subscription.plan_name }} Plan — <strong>{{ subscription.days_remaining }} days remaining</strong>
+        {% else %}Subscription Expired{% endif %}
+    </div>
+    {% if subscription.days_remaining <= 10 %}
+    <a href="{% url 'subscription:activate' %}" class="btn btn-primary btn-sm">Upgrade Now</a>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="page-header">
+    <h1 class="page-title">👩‍⚕️ Therapist Dashboard</h1>
+    <p class="page-subtitle">Manage patients, monitor progress and send feedback</p>
+</div>
+
+<div class="stats-grid" style="grid-template-columns:repeat(2,1fr);max-width:500px;">
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(99,102,241,0.2);">👥</div>
+        <div><div class="stat-value" style="color:var(--primary);">{{ total_patients }}</div><div class="stat-label">Total Patients</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(16,185,129,0.2);">📅</div>
+        <div><div class="stat-value" style="color:var(--success);">{{ total_sessions_today }}</div><div class="stat-label">Sessions Today</div></div>
+    </div>
+</div>
+
+<!-- Search & Filter -->
+<div class="glass-card" style="margin-bottom:24px;">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:14px;"><i class="fas fa-filter" style="color:var(--primary);margin-right:8px;"></i>Filter & Search Patients</h3>
+    <form method="get">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto auto;gap:10px;align-items:end;">
+            <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px;">Patient Name</label>
+                <input type="text" name="name" class="form-input" placeholder="Search by name..." value="{{ name_filter }}">
+            </div>
+            <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px;">Severity</label>
+                <select name="severity" class="form-input">
+                    <option value="">All</option>
+                    <option value="mild" {% if severity_filter == 'mild' %}selected{% endif %}>Mild</option>
+                    <option value="moderate" {% if severity_filter == 'moderate' %}selected{% endif %}>Moderate</option>
+                    <option value="severe" {% if severity_filter == 'severe' %}selected{% endif %}>Severe</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px;">Min Accuracy %</label>
+                <input type="number" name="min_acc" class="form-input" placeholder="0" value="{{ min_acc }}" min="0" max="100">
+            </div>
+            <div>
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px;">Max Accuracy %</label>
+                <input type="number" name="max_acc" class="form-input" placeholder="100" value="{{ max_acc }}" min="0" max="100">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="margin-top:0;white-space:nowrap;">
+                <i class="fas fa-search"></i> Search
+            </button>
+            <a href="{% url 'therapist:dashboard' %}" class="btn btn-glass btn-sm" style="white-space:nowrap;">Clear</a>
+        </div>
+    </form>
+</div>
+
+<!-- Patient Table -->
+<div class="glass-card">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">👥 Patients ({{ total_patients }})</h3>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Patient</th>
+                    <th>Severity</th>
+                    <th>Avg Accuracy</th>
+                    <th>Sessions</th>
+                    <th>Last Practice</th>
+                    <th>Feedback</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for p in patient_data %}
+            <tr>
+                <td>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        {% if p.user.profile_picture %}
+                        <img src="{{ p.user.profile_picture.url }}" style="width:36px;height:36px;border-radius:10px;object-fit:cover;">
+                        {% else %}
+                        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">
+                            {{ p.user.first_name|first }}
+                        </div>
+                        {% endif %}
+                        <div>
+                            <div style="font-weight:600;font-size:14px;">{{ p.user.get_full_name }}</div>
+                            <div style="font-size:12px;color:var(--text-secondary);">@{{ p.user.username }}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    {% if p.profile %}
+                        {% if p.profile.severity == 'mild' %}
+                        <span style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;">Mild</span>
+                        {% elif p.profile.severity == 'moderate' %}
+                        <span style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fcd34d;">Moderate</span>
+                        {% else %}
+                        <span style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;">Severe</span>
+                        {% endif %}
+                    {% else %}
+                    <span style="color:var(--text-secondary);">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div class="progress-bar" style="min-width:60px;flex:1;">
+                            <div class="progress-fill" style="width:{{ p.avg_accuracy }}%;
+                                {% if p.avg_accuracy >= 70 %}background:var(--success);
+                                {% elif p.avg_accuracy >= 40 %}background:var(--warning);
+                                {% else %}background:var(--danger);{% endif %}"></div>
+                        </div>
+                        <span style="font-weight:700;font-size:14px;{% if p.avg_accuracy >= 70 %}color:var(--success);{% elif p.avg_accuracy >= 40 %}color:var(--warning);{% else %}color:var(--danger);{% endif %}">{{ p.avg_accuracy }}%</span>
+                    </div>
+                </td>
+                <td style="color:var(--text-secondary);">{{ p.total_sessions }}</td>
+                <td style="font-size:13px;color:var(--text-secondary);">
+                    {% if p.last_practice %}{{ p.last_practice|date:"M d, Y" }}{% else %}Never{% endif %}
+                </td>
+                <td>
+                    {% if p.unread_feedbacks > 0 %}
+                    <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;">{{ p.unread_feedbacks }} unread</span>
+                    {% else %}<span style="color:var(--text-secondary);">—</span>{% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'therapist:patient_detail' p.user.id %}" class="btn btn-glass btn-sm">
+                        <i class="fas fa-eye"></i> View
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary);">
+                    No patients found matching filters.
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

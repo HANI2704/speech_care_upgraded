@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% block title %}Patient: {{ patient.get_full_name }}{% endblock %}
+{% block content %}
+
+{% if severity_upgraded %}
+<div class="alert alert-success" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;">
+    🎉 <strong>Severity Level Upgraded!</strong> {{ patient.get_full_name }} has been automatically upgraded to
+    <strong>{{ profile.severity|capfirst }}</strong> level based on improved speech accuracy.
+</div>
+{% endif %}
+
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-success" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;">
+    ✅ {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+        <a href="{% url 'therapist:dashboard' %}" style="font-size:13px;color:var(--text-secondary);text-decoration:none;">← Back to Dashboard</a>
+        <h1 class="page-title" style="margin-top:6px;">{{ patient.get_full_name }}</h1>
+        <p class="page-subtitle">@{{ patient.username }}{% if profile %} · {{ profile.diagnosis|default:"No diagnosis" }}{% endif %}</p>
+    </div>
+    {% if profile %}
+    <div style="text-align:center;padding:14px 24px;border-radius:14px;
+        {% if profile.severity == 'mild' %}background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);
+        {% elif profile.severity == 'moderate' %}background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);
+        {% else %}background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);{% endif %}">
+        <div style="font-size:20px;font-weight:800;{% if profile.severity == 'mild' %}color:#6ee7b7;{% elif profile.severity == 'moderate' %}color:#fcd34d;{% else %}color:#fca5a5;{% endif %}">{{ profile.severity|capfirst }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Severity Level</div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(99,102,241,0.2);">🎯</div>
+        <div><div class="stat-value" style="color:var(--primary);">{{ avg_accuracy }}%</div><div class="stat-label">Avg Accuracy</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(16,185,129,0.2);">📅</div>
+        <div><div class="stat-value" style="color:var(--success);">{{ total_sessions }}</div><div class="stat-label">Total Sessions</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(245,158,11,0.2);">🏆</div>
+        <div><div class="stat-value" style="color:var(--warning);">{{ best_score|floatformat:1 }}%</div><div class="stat-label">Best Score</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(6,182,212,0.2);">💬</div>
+        <div><div class="stat-value" style="color:var(--accent);">{{ feedbacks.count }}</div><div class="stat-label">Total Feedbacks</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(139,92,246,0.2);">📸</div>
+        <div><div class="stat-value" style="color:#c4b5fd;">{{ screenshots_count }}</div><div class="stat-label">Exercise Screenshots</div></div>
+    </div>
+</div>
+
+<!-- Exercise Screenshots Preview -->
+{% if exercise_completions %}
+<div class="glass-card" style="margin-bottom:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="font-size:16px;font-weight:700;">📸 Recent Exercise Completions</h3>
+        <a href="{% url 'therapist:exercise_screenshots' patient.id %}" class="btn btn-glass btn-sm">
+            View All Screenshots →
+        </a>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;">
+    {% for c in exercise_completions %}
+    <div style="border-radius:12px;overflow:hidden;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);">
+        {% if c.screenshot %}
+        <a href="{% url 'therapist:exercise_screenshots' patient.id %}">
+            <img src="{{ c.screenshot.url }}" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block;">
+        </a>
+        {% else %}
+        <div style="aspect-ratio:4/3;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;font-size:28px;">🏋️</div>
+        {% endif %}
+        <div style="padding:10px;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:2px;">{{ c.exercise.title }}</div>
+            <div style="font-size:11px;color:var(--text-secondary);">{{ c.completed_at|date:"M d, H:i" }}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                {% if c.score >= 70 %}<span style="font-size:13px;font-weight:800;color:var(--success);">{{ c.score|floatformat:0 }}%</span>
+                {% elif c.score >= 45 %}<span style="font-size:13px;font-weight:800;color:var(--warning);">{{ c.score|floatformat:0 }}%</span>
+                {% else %}<span style="font-size:13px;font-weight:800;color:var(--danger);">{{ c.score|floatformat:0 }}%</span>{% endif %}
+                {% if c.weak_side_at_completion != 'none' %}
+                <span style="font-size:10px;color:#fcd34d;">⚠️ {{ c.weak_side_at_completion|capfirst }}</span>
+                {% else %}
+                <span style="font-size:10px;color:#6ee7b7;">✅</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    </div>
+    {% if screenshots_count == 0 %}
+    <p style="font-size:13px;color:var(--text-secondary);margin-top:12px;">No screenshots yet — patient needs to use "Start with Camera" on the exercises page.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Charts -->
+<div class="grid-2" style="margin-bottom:24px;">
+    <div class="glass-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">📊 Speech Accuracy Over Time</h3>
+        <canvas id="progressChart" height="140"></canvas>
+    </div>
+    <div class="glass-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">🕸️ Component Scores</h3>
+        <canvas id="radarChart" height="140"></canvas>
+    </div>
+</div>
+
+<!-- Send Feedback -->
+<div class="glass-card" style="margin-bottom:24px;">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">✉️ Send Feedback to Patient</h3>
+    <form method="post" action="{% url 'therapist:send_feedback' patient.id %}">
+        {% csrf_token %}
+        <div style="margin-bottom:16px;">
+            <label class="form-label">Feedback Message</label>
+            <textarea name="feedback_text" class="form-input" rows="3" placeholder="Write personalized guidance for the patient..." required style="resize:vertical;"></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;">
+            <div>
+                <label class="form-label">Rating</label>
+                <select name="rating" class="form-input">
+                    <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                    <option value="4">⭐⭐⭐⭐ Good</option>
+                    <option value="3" selected>⭐⭐⭐ Average</option>
+                    <option value="2">⭐⭐ Needs Work</option>
+                    <option value="1">⭐ Poor</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Link to Session (optional)</label>
+                <select name="session_id" class="form-input">
+                    <option value="">— General Feedback —</option>
+                    {% for s in sessions|slice:":10" %}
+                    <option value="{{ s.id }}">{{ s.created_at|date:"M d, Y" }} — {{ s.final_score|floatformat:1 }}%</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-paper-plane"></i> Send Feedback
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Feedback History -->
+{% if feedbacks %}
+<div class="glass-card" style="margin-bottom:24px;">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">📜 Feedback History</h3>
+    {% for fb in feedbacks %}
+    <div style="padding:14px;border-radius:12px;margin-bottom:10px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-left:3px solid var(--primary);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:12px;color:var(--text-secondary);">{{ fb.created_at|date:"M d, Y H:i" }}</span>
+            <span>{% for i in "12345" %}{% if forloop.counter <= fb.rating %}⭐{% endif %}{% endfor %}</span>
+        </div>
+        <p style="font-size:14px;margin:0;">{{ fb.feedback_text }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Session Table -->
+<div class="glass-card">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">🕒 Practice Sessions</h3>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead><tr><th>Date</th><th>Score</th><th>Text Acc.</th><th>Volume</th><th>Add/Update Note</th></tr></thead>
+            <tbody>
+            {% for s in sessions|slice:":20" %}
+            <tr>
+                <td>{{ s.created_at|date:"M d, Y H:i" }}</td>
+                <td>
+                    {% if s.final_score >= 70 %}<span style="color:var(--success);font-weight:700;">{{ s.final_score|floatformat:1 }}%</span>
+                    {% elif s.final_score >= 40 %}<span style="color:var(--warning);font-weight:700;">{{ s.final_score|floatformat:1 }}%</span>
+                    {% else %}<span style="color:var(--danger);font-weight:700;">{{ s.final_score|floatformat:1 }}%</span>{% endif %}
+                </td>
+                <td style="color:var(--text-secondary);">{{ s.text_accuracy|floatformat:1 }}%</td>
+                <td style="color:var(--text-secondary);">{{ s.volume_score|floatformat:1 }}%</td>
+                <td>
+                    <form method="post" action="{% url 'therapist:save_note' s.id %}" style="display:flex;gap:8px;">
+                        {% csrf_token %}
+                        <input type="text" name="note" class="form-input" style="padding:7px 12px;font-size:13px;" placeholder="Add note..." value="{{ s.therapist_notes }}">
+                        <button type="submit" class="btn btn-glass btn-sm">Save</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const chartDefaults = {
+    scales: {
+        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', maxRotation: 30 } }
+    }
+};
+new Chart(document.getElementById('progressChart'), {
+  type: 'line',
+  data: {
+    labels: {{ chart_labels|safe }},
+    datasets: [{ label: 'Score', data: {{ chart_data|safe }},
+      borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)',
+      tension: 0.4, fill: true, pointBackgroundColor: '#6366f1', pointRadius: 4 }]
+  },
+  options: { plugins: { legend: { display: false } }, ...chartDefaults }
+});
+new Chart(document.getElementById('radarChart'), {
+  type: 'radar',
+  data: {
+    labels: ['Text Acc.', 'Volume', 'Stability', 'Rate', 'Clarity'],
+    datasets: [{
+      data: {{ radar_data|safe }},
+      backgroundColor: 'rgba(99,102,241,0.2)',
+      borderColor: '#6366f1',
+      pointBackgroundColor: '#6366f1'
+    }]
+  },
+  options: {
+    scales: { r: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#94a3b8', backdropColor: 'transparent' }, pointLabels: { color: '#94a3b8' } } },
+    plugins: { legend: { display: false } }
+  }
+});
+</script>
+{% endblock %}
